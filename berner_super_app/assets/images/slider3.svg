@@ -1,0 +1,18 @@
+<svg width="400" height="200" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="slider3Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFE066;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFF399;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="200" fill="url(#slider3Gradient)" rx="10"/>
+  <circle cx="100" cy="40" r="15" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="300" cy="160" r="40" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="350" cy="80" r="18" fill="rgba(255,255,255,0.5)"/>
+
+  <text x="200" y="100" font-family="Arial, sans-serif" font-size="24" font-weight="bold"
+        text-anchor="middle" fill="#333">Stay Connected</text>
+  <text x="200" y="130" font-family="Arial, sans-serif" font-size="16"
+        text-anchor="middle" fill="#333">Always in Touch</text>
+</svg>
