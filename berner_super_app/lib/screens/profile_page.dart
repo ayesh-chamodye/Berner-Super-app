@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../widgets/enhanced_logo.dart';
 import 'auth/auth_wrapper.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -341,15 +342,23 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       const SizedBox(height: 20),
 
-                      // App Version Info
+                      // App Version Info with Enhanced Logo
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: AppColors.surface,
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.primaryOrange.withValues(alpha: 0.2),
+                          ),
                         ),
                         child: Column(
                           children: [
+                            const CompactEnhancedLogo(
+                              size: 40,
+                              showGlow: true,
+                            ),
+                            const SizedBox(height: 12),
                             Text(
                               'Burner Super App',
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_theme.dart';
+import '../widgets/enhanced_logo.dart';
 import 'auth/auth_wrapper.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -98,34 +98,12 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo with shadow effect
-                      Container(
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryOrange.withValues(alpha: 0.3),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            ),
-                            BoxShadow(
-                              color: AppColors.secondaryBlue.withValues(alpha: 0.2),
-                              blurRadius: 30,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: SvgPicture.asset(
-                            'assets/images/burner_logo.svg',
-                            width: 180,
-                            height: 180,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
+                      // Enhanced Logo with animations
+                      const EnhancedLogo(
+                        width: 200,
+                        height: 200,
+                        animated: true,
+                        glowEffect: true,
                       ),
 
                       const SizedBox(height: 40),

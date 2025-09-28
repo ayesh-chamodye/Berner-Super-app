@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_theme.dart';
 import '../../models/user_model.dart';
+import '../../widgets/enhanced_logo.dart';
 import 'signup_page.dart';
 
 class RoleSelectionPage extends StatefulWidget {
@@ -49,35 +49,11 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
               Center(
                 child: Column(
                   children: [
-                    Container(
+                    const EnhancedLogo(
                       width: 100,
                       height: 100,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.primaryOrange,
-                            AppColors.primaryLight,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryOrange.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: SvgPicture.asset(
-                          'assets/images/burner_logo.svg',
-                          width: 70,
-                          height: 70,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                      animated: false,
+                      glowEffect: true,
                     ),
                     const SizedBox(height: 16),
                     Text(

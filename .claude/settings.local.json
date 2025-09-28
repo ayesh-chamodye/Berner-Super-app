@@ -4,7 +4,9 @@
       "Bash(flutter:*)",
       "mcp__ide__getDiagnostics",
       "Bash(dart run:*)",
-      "Bash(timeout 15 flutter run --debug)"
+      "Bash(timeout 15 flutter run --debug)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

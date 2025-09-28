@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/enhanced_logo.dart';
 import 'otp_verification_page.dart';
 import 'login_page.dart';
 
@@ -123,35 +123,11 @@ class _SignupPageState extends State<SignupPage> {
               Center(
                 child: Column(
                   children: [
-                    Container(
+                    const EnhancedLogo(
                       width: 120,
                       height: 120,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.primaryOrange,
-                            AppColors.primaryLight,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryOrange.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: SvgPicture.asset(
-                          'assets/images/burner_logo.svg',
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                      animated: false,
+                      glowEffect: true,
                     ),
                     const SizedBox(height: 24),
                     Text(
