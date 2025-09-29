@@ -49,26 +49,39 @@ class _ProfilePageState extends State<ProfilePage> {
           title: Text(
             'Logout',
             style: TextStyle(
-              color: AppColors.textPrimary,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.darkTextPrimary
+                  : AppColors.textPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
           content: Text(
             'Are you sure you want to logout?',
-            style: TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.textSecondary,
+            ),
           ),
-          backgroundColor: AppColors.surface,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkSurface
+              : AppColors.surface,
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
                 'Cancel',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
+                ),
               ),
             ),
             ElevatedButton(
               onPressed: () async {
-                Navigator.of(context).pop();
+                final navigator = Navigator.of(context);
+                navigator.pop();
 
                 // Show loading indicator
                 showDialog(
@@ -78,7 +91,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppColors.darkSurface
+                            : AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
@@ -90,7 +105,11 @@ class _ProfilePageState extends State<ProfilePage> {
                           const SizedBox(height: 16),
                           Text(
                             'Logging out...',
-                            style: TextStyle(color: AppColors.textPrimary),
+                            style: TextStyle(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? AppColors.darkTextPrimary
+                                  : AppColors.textPrimary,
+                            ),
                           ),
                         ],
                       ),
@@ -103,8 +122,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 await prefs.clear();
 
                 if (mounted) {
-                  Navigator.of(context).pop(); // Close loading dialog
-                  Navigator.of(context).pushAndRemoveUntil(
+                  navigator.pop(); // Close loading dialog
+                  navigator.pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => const AuthWrapper()),
                     (route) => false,
                   );
@@ -127,21 +146,27 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.darkBackground
+          : AppColors.backgroundPrimary,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.darkTextPrimary
+                : AppColors.textPrimary,
           ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Profile',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.darkTextPrimary
+                : AppColors.textPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -167,14 +192,18 @@ class _ProfilePageState extends State<ProfilePage> {
                       Text(
                         'Unable to load profile',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.textPrimary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Please try logging in again',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -236,7 +265,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       Text(
                         _currentUser?.name ?? 'Unknown User',
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: AppColors.textPrimary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -346,7 +377,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.darkSurface
+                              : AppColors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: AppColors.primaryOrange.withValues(alpha: 0.2),
@@ -370,7 +403,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             Text(
                               'Version 1.0.0',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textSecondary,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -390,7 +425,9 @@ class _ProfilePageState extends State<ProfilePage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.darkSurface
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: AppColors.secondaryBlue.withValues(alpha: 0.2),
@@ -418,7 +455,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 Text(
                   title,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -426,7 +465,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 Text(
                   value,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

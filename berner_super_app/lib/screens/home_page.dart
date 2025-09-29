@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../services/theme_service.dart';
 import 'expense_page.dart';
 import 'profile_page.dart';
+import 'weather_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -28,15 +31,15 @@ class _HomePageState extends State<HomePage> {
   String _getGreeting() {
     final hour = DateTime.now().hour;
 
-    if (hour >= 5 && hour < 12) {
-      return 'Good Morning! ☀️';
-    } else if (hour >= 12 && hour < 17) {
-      return 'Good Afternoon! 🌤️';
-    } else if (hour >= 17 && hour < 21) {
-      return 'Good Evening! 🌅';
-    } else {
-      return 'Good Night! 🌙';
-    }
+    if (hour >= 0 && hour < 12) {
+  return 'Good Morning! ☀️';
+} else if (hour >= 12 && hour < 15) {
+  return 'Good Afternoon! 🌤️';
+} else if (hour >= 15 && hour < 18) {
+  return 'Good Evening! 🌅';
+} else {
+  return 'Good Night! 🌙';
+}
   }
 
   String _getGreetingMessage() {
@@ -73,10 +76,30 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Burner Super App',
+          'Berner Super App',
           style: Theme.of(context).appBarTheme.titleTextStyle,
         ),
         actions: [
+          // Theme Toggle Button
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: Consumer<ThemeService>(
+              builder: (context, themeService, child) {
+                return IconButton(
+                  onPressed: () {
+                    themeService.toggleTheme();
+                  },
+                  icon: Icon(
+                    themeService.isDarkMode
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  ),
+                  iconSize: 26,
+                  tooltip: themeService.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                );
+              },
+            ),
+          ),
           // Notification Button
           Container(
             margin: const EdgeInsets.only(right: 8),
@@ -184,7 +207,9 @@ class _HomePageState extends State<HomePage> {
                   Text(
                     _getGreetingMessage(),
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -201,7 +226,9 @@ class _HomePageState extends State<HomePage> {
                     'Featured',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -284,7 +311,9 @@ class _HomePageState extends State<HomePage> {
                     'Quick Actions',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -330,6 +359,24 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     }
+
+    // Add weather button as the second button (always visible)
+    buttons.add(
+      _buildQuickActionCard(
+        context,
+        'Weather',
+        Icons.wb_sunny,
+        AppColors.accent2,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const WeatherScreen(),
+            ),
+          );
+        },
+      ),
+    );
 
     // Add common buttons for all users
     buttons.addAll([
@@ -430,7 +477,9 @@ class _HomePageState extends State<HomePage> {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,

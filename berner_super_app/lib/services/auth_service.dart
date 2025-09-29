@@ -24,7 +24,7 @@ class AuthService {
     final otp = List.generate(6, (index) => random.nextInt(10)).join();
 
     // In real app, send SMS here
-    print('OTP for $mobileNumber: $otp'); // For debugging
+    // OTP: $otp (for debugging - remove in production)
 
     // Store OTP temporarily (in real app, store server-side)
     final prefs = await SharedPreferences.getInstance();

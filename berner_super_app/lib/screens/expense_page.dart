@@ -17,7 +17,11 @@ class _ExpensePageState extends State<ExpensePage> {
 
   String _selectedCategory = 'Food';
   File? _selectedImage;
+  File? _mileageImage;
   final ImagePicker _picker = ImagePicker();
+
+  // Upload history log
+  final List<Map<String, dynamic>> _uploadHistory = [];
 
   final List<Map<String, dynamic>> _categories = [
     {
@@ -59,12 +63,40 @@ class _ExpensePageState extends State<ExpensePage> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error picking image: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickMileageImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 80,
       );
+
+      if (image != null) {
+        setState(() {
+          _mileageImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking mileage image: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -84,13 +116,15 @@ class _ExpensePageState extends State<ExpensePage> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 20),
               Text(
-                'Select Image Source',
+                'Select Receipt Image Source',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -119,6 +153,59 @@ class _ExpensePageState extends State<ExpensePage> {
     );
   }
 
+  void _showMileageImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Select Mileage Image Source',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildMileageImageSourceOption(
+                    'Camera',
+                    Icons.camera_alt,
+                    () => _pickMileageImage(ImageSource.camera),
+                  ),
+                  _buildMileageImageSourceOption(
+                    'Gallery',
+                    Icons.photo_library,
+                    () => _pickMileageImage(ImageSource.gallery),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildImageSourceOption(String title, IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: () {
@@ -128,10 +215,14 @@ class _ExpensePageState extends State<ExpensePage> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 30),
         decoration: BoxDecoration(
-          color: AppColors.primaryOrange.withValues(alpha: 0.1),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.primaryOrange.withValues(alpha: 0.2)
+              : AppColors.primaryOrange.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppColors.primaryOrange.withValues(alpha: 0.3),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.primaryOrange.withValues(alpha: 0.5)
+                : AppColors.primaryOrange.withValues(alpha: 0.3),
           ),
         ),
         child: Column(
@@ -155,8 +246,62 @@ class _ExpensePageState extends State<ExpensePage> {
     );
   }
 
+  Widget _buildMileageImageSourceOption(String title, IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 30),
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.secondaryBlue.withValues(alpha: 0.2)
+              : AppColors.secondaryBlue.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.secondaryBlue.withValues(alpha: 0.5)
+                : AppColors.secondaryBlue.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 32,
+              color: AppColors.secondaryBlue,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.secondaryBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _submitExpense() {
     if (_formKey.currentState!.validate()) {
+      // Add to upload history
+      setState(() {
+        _uploadHistory.insert(0, {
+          'amount': _amountController.text,
+          'category': _selectedCategory,
+          'description': _descriptionController.text.isEmpty
+              ? 'No description'
+              : _descriptionController.text,
+          'imagePath': _selectedImage?.path,
+          'mileageImagePath': _mileageImage?.path,
+          'timestamp': DateTime.now(),
+        });
+      });
+
       // Here you would typically save the expense to a database
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -173,6 +318,7 @@ class _ExpensePageState extends State<ExpensePage> {
       _descriptionController.clear();
       setState(() {
         _selectedImage = null;
+        _mileageImage = null;
         _selectedCategory = 'Food';
       });
     }
@@ -200,7 +346,9 @@ class _ExpensePageState extends State<ExpensePage> {
                 'Amount',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -235,7 +383,9 @@ class _ExpensePageState extends State<ExpensePage> {
                 'Category',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 12),
@@ -292,7 +442,9 @@ class _ExpensePageState extends State<ExpensePage> {
                 'Description (Optional)',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -314,7 +466,9 @@ class _ExpensePageState extends State<ExpensePage> {
                 'Receipt/Bill Image',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 12),
@@ -326,7 +480,9 @@ class _ExpensePageState extends State<ExpensePage> {
                     width: double.infinity,
                     height: 200,
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF2C2C2C)
+                          : AppColors.surfaceVariant,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: AppColors.secondaryBlue,
@@ -354,7 +510,9 @@ class _ExpensePageState extends State<ExpensePage> {
                         Text(
                           'Camera or Gallery',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
+                            color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -430,6 +588,136 @@ class _ExpensePageState extends State<ExpensePage> {
                   ],
                 ),
 
+              // Mileage Image Upload Section (only for Fuel category)
+              if (_selectedCategory == 'Fuel') ...[
+                const SizedBox(height: 24),
+                Text(
+                  'Mileage Image (Optional)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                if (_mileageImage == null)
+                  GestureDetector(
+                    onTap: _showMileageImageSourceDialog,
+                    child: Container(
+                      width: double.infinity,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppColors.darkSurface
+                            : AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.accent2,
+                          style: BorderStyle.solid,
+                          width: 2,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.speed,
+                            size: 40,
+                            color: AppColors.accent2,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Upload Mileage Reading',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AppColors.accent2,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Camera or Gallery',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Stack(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            _mileageImage!,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _mileageImage = null;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: GestureDetector(
+                          onTap: _showMileageImageSourceDialog,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent2,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+
               const SizedBox(height: 32),
 
               // Submit Button
@@ -454,10 +742,187 @@ class _ExpensePageState extends State<ExpensePage> {
               ),
 
               const SizedBox(height: 20),
+
+              // Upload History Log
+              if (_uploadHistory.isNotEmpty) ...[
+                const Divider(height: 40),
+                Text(
+                  'Upload History',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...(_uploadHistory.take(5).map((expense) => _buildHistoryItem(expense))),
+                if (_uploadHistory.length > 5)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Showing latest 5 of ${_uploadHistory.length} expenses',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildHistoryItem(Map<String, dynamic> expense) {
+    final category = _categories.firstWhere(
+      (cat) => cat['name'] == expense['category'],
+      orElse: () => _categories.first,
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.darkSurface
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.secondaryBlue.withValues(alpha: 0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Category Icon
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: category['color'].withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              category['icon'],
+              color: category['color'],
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Expense Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '\$${expense['amount']}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      _formatTimestamp(expense['timestamp']),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  expense['category'],
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: category['color'],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (expense['description'] != 'No description') ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    expense['description'],
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Image indicators
+          Row(
+            children: [
+              if (expense['imagePath'] != null)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Icon(
+                    Icons.image,
+                    color: AppColors.success,
+                    size: 16,
+                  ),
+                ),
+              if (expense['mileageImagePath'] != null)
+                Container(
+                  margin: const EdgeInsets.only(left: 4),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent2.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Icon(
+                    Icons.speed,
+                    color: AppColors.accent2,
+                    size: 16,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
   }
 }

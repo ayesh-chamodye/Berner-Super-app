@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
@@ -434,7 +433,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedGender,
+                initialValue: _selectedGender,
                 decoration: InputDecoration(
                   hintText: 'Select your gender',
                   prefixIcon: Icon(Icons.person_outline, color: AppColors.primaryOrange),

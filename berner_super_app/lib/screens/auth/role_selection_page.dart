@@ -57,7 +57,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'BURNER',
+                      'BERNER',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         color: AppColors.primaryOrange,
                         fontWeight: FontWeight.bold,
@@ -88,7 +88,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Choose how you\'ll be using Burner Super App',
+                'Choose how you\'ll be using Berner Super App',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: AppColors.textSecondary,
                 ),

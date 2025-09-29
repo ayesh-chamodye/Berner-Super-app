@@ -11,7 +11,7 @@
   <circle cx="50" cy="150" r="20" fill="rgba(255,255,255,0.3)"/>
 
   <text x="200" y="100" font-family="Arial, sans-serif" font-size="24" font-weight="bold"
-        text-anchor="middle" fill="white">Welcome to Burner</text>
+        text-anchor="middle" fill="white">Welcome to Berner</text>
   <text x="200" y="130" font-family="Arial, sans-serif" font-size="16"
         text-anchor="middle" fill="white">Your Super App Experience</text>
 </svg>

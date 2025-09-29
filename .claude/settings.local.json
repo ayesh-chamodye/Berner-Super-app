@@ -6,7 +6,11 @@
       "Bash(dart run:*)",
       "Bash(timeout 15 flutter run --debug)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(ren:*)",
+      "Bash(move burner_logo.svg berner_logo.svg)",
+      "Bash(move burner_logo.avif berner_logo.avif)",
+      "Bash(move burner_logo_enhanced.svg berner_logo_enhanced.svg)"
     ],
     "deny": [],
     "ask": []

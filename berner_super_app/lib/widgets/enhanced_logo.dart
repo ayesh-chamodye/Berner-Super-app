@@ -123,7 +123,7 @@ class _EnhancedLogoState extends State<EnhancedLogo>
             children: [
               // Base logo
               SvgPicture.asset(
-                'assets/images/burner_logo.svg',
+                'assets/images/berner_logo.svg',
                 width: widget.width - 16,
                 height: widget.height - 16,
                 fit: BoxFit.contain,
@@ -243,7 +243,7 @@ class CompactEnhancedLogo extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: SvgPicture.asset(
-                  'assets/images/burner_logo.svg',
+                  'assets/images/berner_logo.svg',
                   fit: BoxFit.contain,
                 ),
               ),

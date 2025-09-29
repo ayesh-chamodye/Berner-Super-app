@@ -127,7 +127,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'BURNER',
+                      'BERNER',
                       style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                         color: AppColors.primaryOrange,
                         fontWeight: FontWeight.bold,

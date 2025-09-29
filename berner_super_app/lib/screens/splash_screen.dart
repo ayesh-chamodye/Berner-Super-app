@@ -110,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                       // App Title
                       Text(
-                        'BURNER',
+                        'BERNER',
                         style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                           color: AppColors.primaryOrange,
                           fontWeight: FontWeight.bold,
