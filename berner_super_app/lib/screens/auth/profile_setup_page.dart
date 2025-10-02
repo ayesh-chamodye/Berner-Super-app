@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/supabase_service.dart';
 import '../home_page.dart';
 
 class ProfileSetupPage extends StatefulWidget {
@@ -241,16 +242,54 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     });
 
     try {
+      print('🔵 ProfileSetupPage: Starting profile save');
+      print('🔵 ProfileSetupPage: User ID: ${widget.user.id}');
+      print('🔵 ProfileSetupPage: Mobile Number: ${widget.user.mobileNumber}');
+
       // Update user with profile information
+      final nameParts = _nameController.text.trim().split(' ');
+      final firstName = nameParts.isNotEmpty ? nameParts.first : '';
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final fullName = _nameController.text.trim();
+
+      print('🔵 ProfileSetupPage: Attempting to save to Supabase...');
+      print('🔵 ProfileSetupPage: Name: $fullName');
+      print('🔵 ProfileSetupPage: NIC: ${_nicController.text.trim()}');
+      print('🔵 ProfileSetupPage: DOB: $_selectedDate');
+      print('🔵 ProfileSetupPage: Gender: $_selectedGender');
+
+      // Save profile to Supabase using create_user_with_profile or update existing profile
+      try {
+        await SupabaseService.createOrUpdateUserProfile(
+          mobileNumber: widget.user.mobileNumber,
+          firstName: firstName,
+          lastName: lastName,
+          fullName: fullName,
+          nic: _nicController.text.trim(),
+          dateOfBirth: _selectedDate,
+          gender: _selectedGender,
+          profilePictureUrl: _profileImage?.path,
+        );
+        print('🟢 ProfileSetupPage: Profile saved to Supabase successfully!');
+      } catch (supabaseError) {
+        print('❌ ProfileSetupPage: Failed to save to Supabase: $supabaseError');
+        print('⚠️ ProfileSetupPage: Will save to local storage only');
+        // Continue execution - app will work with local storage
+      }
+
+      // Update user model locally
       final updatedUser = widget.user.copyWith(
-        name: _nameController.text.trim(),
+        firstName: firstName,
+        lastName: lastName,
+        fullName: fullName,
         nic: _nicController.text.trim(),
         dateOfBirth: _selectedDate,
         gender: _selectedGender,
-        profilePicturePath: _profileImage?.path,
+        profilePictureUrl: _profileImage?.path,
       );
 
       await AuthService.updateUserProfile(updatedUser);
+      print('🟢 ProfileSetupPage: Profile saved locally');
 
       if (mounted) {
         // Show success message

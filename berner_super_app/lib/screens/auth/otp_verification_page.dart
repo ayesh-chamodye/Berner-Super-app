@@ -11,14 +11,12 @@ class OTPVerificationPage extends StatefulWidget {
   final String mobileNumber;
   final bool isSignup;
   final UserRole? selectedRole; // For signup only
-  final String? demoOTP; // For demo purposes only
 
   const OTPVerificationPage({
     super.key,
     required this.mobileNumber,
     required this.isSignup,
     this.selectedRole,
-    this.demoOTP,
   });
 
   @override
@@ -224,33 +222,6 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
               ),
 
               const SizedBox(height: 48),
-
-              // Demo OTP Display (Remove in production)
-              if (widget.demoOTP != null)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  margin: const EdgeInsets.only(bottom: 24),
-                  decoration: BoxDecoration(
-                    color: Colors.yellow.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline, color: Colors.orange),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Demo OTP: ${widget.demoOTP}',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.orange[800],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
 
               // OTP Input
               OTPInput(

@@ -20,7 +20,7 @@ class _ExpensePageState extends State<ExpensePage> {
   File? _mileageImage;
   final ImagePicker _picker = ImagePicker();
 
-  // Upload history log
+  // Upload history log with approval status
   final List<Map<String, dynamic>> _uploadHistory = [];
 
   final List<Map<String, dynamic>> _categories = [
@@ -288,7 +288,7 @@ class _ExpensePageState extends State<ExpensePage> {
 
   void _submitExpense() {
     if (_formKey.currentState!.validate()) {
-      // Add to upload history
+      // Add to upload history with initial status
       setState(() {
         _uploadHistory.insert(0, {
           'amount': _amountController.text,
@@ -299,6 +299,7 @@ class _ExpensePageState extends State<ExpensePage> {
           'imagePath': _selectedImage?.path,
           'mileageImagePath': _mileageImage?.path,
           'timestamp': DateTime.now(),
+          'status': 'pending', // pending, approved, rejected
         });
       });
 
@@ -873,37 +874,73 @@ class _ExpensePageState extends State<ExpensePage> {
             ),
           ),
 
-          // Image indicators
-          Row(
+          // Status badge and image indicators
+          Column(
             children: [
-              if (expense['imagePath'] != null)
-                Container(
-                  margin: const EdgeInsets.only(left: 8),
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(
-                    Icons.image,
-                    color: AppColors.success,
-                    size: 16,
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(expense['status']).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _getStatusColor(expense['status']),
+                    width: 1,
                   ),
                 ),
-              if (expense['mileageImagePath'] != null)
-                Container(
-                  margin: const EdgeInsets.only(left: 4),
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent2.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(
-                    Icons.speed,
-                    color: AppColors.accent2,
-                    size: 16,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getStatusIcon(expense['status']),
+                      color: _getStatusColor(expense['status']),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _getStatusText(expense['status']),
+                      style: TextStyle(
+                        color: _getStatusColor(expense['status']),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(height: 8),
+              // Image indicators
+              Row(
+                children: [
+                  if (expense['imagePath'] != null)
+                    Container(
+                      margin: const EdgeInsets.only(right: 4),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.image,
+                        color: AppColors.success,
+                        size: 16,
+                      ),
+                    ),
+                  if (expense['mileageImagePath'] != null)
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent2.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.speed,
+                        color: AppColors.accent2,
+                        size: 16,
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
         ],
@@ -923,6 +960,42 @@ class _ExpensePageState extends State<ExpensePage> {
       return '${difference.inHours}h ago';
     } else {
       return '${difference.inDays}d ago';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'approved':
+        return AppColors.success;
+      case 'rejected':
+        return AppColors.error;
+      case 'pending':
+      default:
+        return AppColors.accent1;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'approved':
+        return Icons.check_circle;
+      case 'rejected':
+        return Icons.cancel;
+      case 'pending':
+      default:
+        return Icons.schedule;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      case 'pending':
+      default:
+        return 'Pending';
     }
   }
 }

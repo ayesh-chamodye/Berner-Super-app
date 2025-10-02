@@ -70,7 +70,19 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       // Send OTP
-      final otp = await AuthService.sendOTP(mobileNumber);
+      final result = await AuthService.sendOTP(mobileNumber);
+
+      if (!result['success']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to send OTP'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
 
       if (mounted) {
         // Navigate to OTP verification
@@ -80,7 +92,6 @@ class _LoginPageState extends State<LoginPage> {
             builder: (context) => OTPVerificationPage(
               mobileNumber: mobileNumber,
               isSignup: false,
-              demoOTP: otp, // Remove in production
             ),
           ),
         );

@@ -10,7 +10,10 @@
       "Bash(ren:*)",
       "Bash(move burner_logo.svg berner_logo.svg)",
       "Bash(move burner_logo.avif berner_logo.avif)",
-      "Bash(move burner_logo_enhanced.svg berner_logo_enhanced.svg)"
+      "Bash(move burner_logo_enhanced.svg berner_logo_enhanced.svg)",
+      "Bash(dart:*)",
+      "Bash(cat:*)",
+      "Bash(curl -I https://ompqyjdrfnjdxqavslhg.supabase.co)"
     ],
     "deny": [],
     "ask": []

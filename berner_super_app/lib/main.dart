@@ -3,8 +3,32 @@ import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'services/theme_service.dart';
+import 'config/app_config.dart';
+import 'services/supabase_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize app configuration
+  try {
+    await AppConfig.initialize();
+    print('✓ Configuration loaded');
+  } catch (e) {
+    print('⚠ Configuration loading failed: $e');
+  }
+
+  // Initialize Supabase if configured
+  if (AppConfig.isConfigured) {
+    try {
+      await SupabaseService.initialize();
+      print('✓ Supabase initialized');
+    } catch (e) {
+      print('⚠ Supabase initialization failed: $e');
+    }
+  } else {
+    print('⚠ Supabase not configured. Add credentials to .env file.');
+  }
+
   runApp(const MyApp());
 }
 
