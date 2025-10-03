@@ -313,7 +313,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   children: [
                     Text(
-                      'Why Choose Burner?',
+                      'Why Choose Berner?',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,

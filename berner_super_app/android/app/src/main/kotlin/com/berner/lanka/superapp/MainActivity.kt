@@ -1,4 +1,4 @@
-package com.example.berner_super_app
+package com.berner.lanka.superapp
 
 import io.flutter.embedding.android.FlutterActivity
 

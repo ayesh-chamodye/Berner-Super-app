@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <application
-        android:label="berner_super_app"
+        android:label="Berner Super App"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

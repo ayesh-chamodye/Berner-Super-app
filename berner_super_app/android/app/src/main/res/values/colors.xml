@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Berner Super App Brand Colors -->
+    <color name="splash_background">#F47D4A</color>
+    <color name="primary_orange">#F35E0C</color>
+    <color name="secondary_blue">#9AC1DE</color>
+</resources>

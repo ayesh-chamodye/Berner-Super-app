@@ -201,7 +201,7 @@ class AppTheme {
 
       // AppBar Theme
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.secondaryBlue,
+        backgroundColor: AppColors.primaryLight,
         foregroundColor: AppColors.textOnSecondary,
         elevation: 4,
         shadowColor: AppColors.secondaryBlue.withValues(alpha: 0.5),

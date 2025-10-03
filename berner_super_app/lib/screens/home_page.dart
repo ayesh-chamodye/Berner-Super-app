@@ -12,6 +12,7 @@ import 'profile_page.dart';
 import 'weather_screen.dart';
 import 'support_tickets_page.dart';
 import 'notifications_page.dart';
+import 'about_app_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -127,10 +128,16 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Berner Super App',
-          style: Theme.of(context).appBarTheme.titleTextStyle,
+        title: SizedBox(
+          height: 40,
+          child: Image.asset(
+            Theme.of(context).brightness == Brightness.dark
+                ? 'assets/images/berner_white.png'
+                : 'assets/images/berner_dark.png',
+            fit: BoxFit.contain,
+          ),
         ),
+        centerTitle: false,
         actions: [
           // Theme Toggle Button
           Container(
@@ -453,6 +460,36 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
+            //Partners section
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  Text(
+                    'Our Partners',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 1.5,
+                    children: _partners(),
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 32),
           ],
         ),
@@ -460,6 +497,37 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  List<Widget> _partners() {
+    List<Widget> partners = [];
+    partners.addAll([
+      _buildImageQuickActionCard(
+        context,
+        'Berner',
+        'assets/images/berner.png',
+      ),
+      _buildImageQuickActionCard(
+        context,
+        'Menzerna',
+        'assets/images/menzerna.png',
+      ),
+      _buildImageQuickActionCard(
+        context,
+        'Yato',        
+        'assets/images/yato.png',
+      ),      
+      _buildImageQuickActionCard(
+        context,
+        'Car System',
+        'assets/images/car_system.png',
+      ),
+      _buildImageQuickActionCard(
+        context,
+        'Blue Chem',
+        'assets/images/chem.png',
+      )
+    ]);
+    return partners;
+  }
   List<Widget> _buildQuickActionButtons() {
     List<Widget> buttons = [];
 
@@ -469,8 +537,8 @@ class _HomePageState extends State<HomePage> {
         _buildQuickActionCard(
           context,
           'Expenses',
-          Icons.receipt_long,
           AppColors.error,
+          icon: Icons.receipt_long,
           onTap: () {
             Navigator.push(
               context,
@@ -488,8 +556,8 @@ class _HomePageState extends State<HomePage> {
       _buildQuickActionCard(
         context,
         'Weather',
-        Icons.wb_sunny,
         AppColors.accent2,
+        icon: Icons.wb_sunny,
         onTap: () {
           Navigator.push(
             context,
@@ -502,24 +570,18 @@ class _HomePageState extends State<HomePage> {
     );
 
     // Add common buttons for all users
-    buttons.addAll([
-      _buildQuickActionCard(
-        context,
-        'Services',
-        Icons.miscellaneous_services,
-        AppColors.primaryOrange,
-      ),
+    buttons.addAll([      
       _buildQuickActionCard(
         context,
         'Payments',
-        Icons.payment,
         AppColors.secondaryBlue,
+        icon: Icons.payment,
       ),
       _buildQuickActionCard(
         context,
         'Support',
-        Icons.support_agent,
         AppColors.success,
+        icon: Icons.support_agent,
         onTap: () {
           Navigator.push(
             context,
@@ -532,8 +594,8 @@ class _HomePageState extends State<HomePage> {
       _buildQuickActionCard(
         context,
         'Settings',
-        Icons.settings,
         AppColors.accent1,
+        icon: Icons.settings,
       ),
     ]);
 
@@ -543,8 +605,8 @@ class _HomePageState extends State<HomePage> {
         _buildQuickActionCard(
           context,
           'Profile',
-          Icons.person_outline,
           AppColors.secondaryBlue,
+          icon: Icons.person_outline,
         ),
       );
     }
@@ -553,19 +615,40 @@ class _HomePageState extends State<HomePage> {
       _buildQuickActionCard(
         context,
         'More',
-        Icons.more_horiz,
         AppColors.textSecondary,
+        icon: Icons.more_horiz,
+      ),
+    );
+
+    buttons.add(
+      _buildQuickActionCard(
+        context,
+        'About App',
+        AppColors.primaryOrange,
+        icon: Icons.info_outline,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AboutAppPage(),
+            ),
+          );
+        },
       ),
     );
 
     return buttons;
   }
 
+
+
+
   Widget _buildQuickActionCard(
     BuildContext context,
-    String title,
-    IconData icon,
+    String title,    
     Color color, {
+       IconData? icon,
+    String? imagePath,
     VoidCallback? onTap,
   }) {
     return Card(
@@ -577,7 +660,7 @@ class _HomePageState extends State<HomePage> {
         onTap: onTap ?? () {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$title tapped'),
+              content: Text('$title Comming Soon!'),
               duration: const Duration(seconds: 1),
             ),
           );
@@ -599,11 +682,45 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 32,
-                color: color,
-              ),
+              if (imagePath != null)
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: imagePath.endsWith('.svg')
+                      ? SvgPicture.asset(
+                          imagePath,
+                          fit: BoxFit.contain,
+                          colorFilter: ColorFilter.mode(
+                            color,
+                            BlendMode.srcIn,
+                          ),
+                        )
+                      : Image.asset(
+                          imagePath,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('Error loading image: $imagePath');
+                            print('Error: $error');
+                            return Icon(
+                              Icons.image_not_supported,
+                              size: 32,
+                              color: color,
+                            );
+                          },
+                        ),
+                )
+              else if (icon != null)
+                Icon(
+                  icon,
+                  size: 32,
+                  color: color,
+                )
+              else
+                Icon(
+                  Icons.apps,
+                  size: 32,
+                  color: color,
+                ),
               const SizedBox(height: 8),
               Text(
                 title,
@@ -617,6 +734,96 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // New method for image background buttons
+  Widget _buildImageQuickActionCard(
+    BuildContext context,
+    String title,
+    String imagePath, {
+    VoidCallback? onTap,
+  }) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap ?? () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$title Coming Soon!'),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        },
+        child: Stack(
+          children: [
+            // Background Image
+            Positioned.fill(
+              child: imagePath.endsWith('.svg')
+                  ? SvgPicture.asset(
+                      imagePath,
+                      fit: BoxFit.cover,
+                    )
+                  : Image.asset(
+                      imagePath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Error loading image: $imagePath');
+                        print('Error: $error');
+                        return Container(
+                          color: Colors.grey[300],
+                          child: const Icon(
+                            Icons.image_not_supported,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            // Gradient overlay for better text readability
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.6),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Title at bottom
+            Positioned(
+              bottom: 12,
+              left: 12,
+              right: 12,
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      offset: const Offset(0, 1),
+                      blurRadius: 3.0,
+                      color: Colors.black.withValues(alpha: 0.5),
+                    ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
         ),
       ),
     );

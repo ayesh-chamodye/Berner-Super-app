@@ -16,7 +16,21 @@
       "Bash(curl -I https://ompqyjdrfnjdxqavslhg.supabase.co)",
       "Bash(gradlew:*)",
       "Bash(./gradlew:*)",
-      "Bash(cmd /c:*)"
+      "Bash(cmd /c:*)",
+      "Bash(where convert)",
+      "Bash(where magick)",
+      "Bash(where inkscape)",
+      "Bash(python:*)",
+      "Bash(where python3)",
+      "Bash(where py)",
+      "Bash(python3:*)",
+      "Bash(del create_icon.py)",
+      "Bash(keytool:*)",
+      "Bash(where keytool)",
+      "Bash(java:*)",
+      "Bash(powershell:*)",
+      "Bash(\"C:\\Program Files\\Android\\Android Studio\\jbr\\bin\\keytool.exe\" -genkey -v -keystore \"e:\\Berner Super app\\upload-keystore.jks\" -keyalg RSA -keysize 2048 -validity 10000 -alias upload -storepass berner2024 -keypass berner2024 -dname \"CN=Berner Lanka, OU=Mobile, O=Berner, L=Colombo, S=Western, C=LK\")",
+      "Bash(\"C:\\Program Files\\Android\\Android Studio\\jbr\\bin\\keytool.exe\" -printcert -jarfile \"e:\\Berner Super app\\berner_super_app\\build\\app\\outputs\\bundle\\release\\app-release.aab\")"
     ],
     "deny": [],
     "ask": []
