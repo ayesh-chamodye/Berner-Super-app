@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
@@ -6,7 +5,9 @@ import 'supabase_service.dart';
 import 'textlk_sms_service.dart';
 
 class AuthService {
-  static const String _userKey = 'current_user';
+  // Session management (minimal - just for OTP and current user ID)
+  static const String _currentUserIdKey = 'current_user_id';
+  static const String _currentUserPhoneKey = 'current_user_phone';
   static const String _isLoggedInKey = 'is_logged_in';
 
   // Generate ADM Code (Administrative Code)
@@ -40,11 +41,11 @@ class AuthService {
       final otp = _generateOTP();
       print('🔐 AuthService: OTP generated locally: $otp');
 
-      // Store OTP temporarily in SharedPreferences (local storage)
+      // Store OTP temporarily in SharedPreferences (ONLY for OTP verification)
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('temp_otp_$mobileNumber', otp);
       await prefs.setInt('otp_timestamp_$mobileNumber', DateTime.now().millisecondsSinceEpoch);
-      print('💾 AuthService: OTP stored in local device storage');
+      print('💾 AuthService: OTP stored temporarily');
 
       // ✅ SEND OTP VIA TEXT.LK SMS API (EXTERNAL SERVICE, NOT SUPABASE)
       print('📤 AuthService: Sending OTP via text.lk SMS API...');
@@ -54,7 +55,7 @@ class AuthService {
       );
       print('📤 text.lk Response: ${result['success'] ? 'SMS sent successfully' : 'SMS failed'}');
 
-      // Log OTP attempt in Supabase (FOR AUDIT ONLY, NOT FOR SENDING)
+      // Log OTP attempt in Supabase (FOR AUDIT ONLY)
       try {
         print('📝 AuthService: Logging OTP attempt to Supabase (audit trail only)');
         await SupabaseService.logOTPAttempt(
@@ -63,7 +64,6 @@ class AuthService {
           errorMessage: result['success'] ? null : result['message'],
         );
       } catch (e) {
-        // Log error but don't fail the operation
         print('⚠️ Failed to log OTP attempt to Supabase: $e (non-critical)');
       }
 
@@ -125,26 +125,25 @@ class AuthService {
     }
   }
 
-  // Register new user with Supabase (creates user without profile initially)
+  // Register new user (creates user in database ONLY)
   static Future<UserModel> registerUser(String mobileNumber, UserRole role) async {
     try {
       print('🔵 Starting user registration for: $mobileNumber');
 
-      // Check if user already exists in Supabase
+      // Check if user already exists in database
       final existingUser = await SupabaseService.getUserByPhone(mobileNumber);
 
       if (existingUser != null) {
         print('🟢 User already exists, marking as verified');
-        // User already exists, mark as verified after OTP
         await SupabaseService.markUserAsVerified(mobileNumber);
         final user = UserModel.fromJson(existingUser);
-        await saveUser(user);
+        await _setCurrentUserSession(user);
         return user;
       }
 
-      print('🔵 Creating new user in Supabase with role: ${role.toString().split('.').last}');
+      print('🔵 Creating new user in database with role: ${role.toString().split('.').last}');
 
-      // Create basic user record (profile will be created in profile_setup_page)
+      // Create basic user record in database
       final userId = await SupabaseService.createBasicUser(
         mobileNumber: mobileNumber,
         role: role.toString().split('.').last,
@@ -156,116 +155,77 @@ class AuthService {
       await SupabaseService.markUserAsVerified(mobileNumber);
       print('🟢 User marked as verified');
 
-      // Fetch the created user
+      // Fetch the created user from database
       final userData = await SupabaseService.getUserByPhone(mobileNumber);
-      if (userData != null) {
-        print('🟢 User data fetched from Supabase');
-        final user = UserModel.fromJson(userData);
-        await saveUser(user);
-        return user;
+      if (userData == null) {
+        throw Exception('Failed to fetch user after creation');
       }
 
-      // Fallback: create user model locally
-      print('⚠️ Fallback: Creating user model locally');
-      final user = UserModel(
-        id: userId.toString(),
-        mobileNumber: mobileNumber,
-        admCode: role == UserRole.employee ? generateAdmCode() : null,
-        role: role,
-        isVerified: true,
-        createdAt: DateTime.now(),
-      );
-      await saveUser(user);
+      final user = UserModel.fromJson(userData);
+      await _setCurrentUserSession(user);
       return user;
     } catch (e) {
       print('❌ Registration error: $e');
-      // Fallback to local storage
-      final user = UserModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        mobileNumber: mobileNumber,
-        admCode: role == UserRole.employee ? generateAdmCode() : null,
-        role: role,
-        isVerified: true,
-        createdAt: DateTime.now(),
-      );
-      await saveUser(user);
-      return user;
+      rethrow;
     }
   }
 
-  // Login user
+  // Login user (fetch from database ONLY)
   static Future<UserModel?> loginUser(String mobileNumber) async {
     try {
-      // Try to get user from Supabase
+      print('🔵 AuthService: Logging in user: $mobileNumber');
+
+      // Get user from database
       final userData = await SupabaseService.getUserByPhone(mobileNumber);
 
-      if (userData != null) {
-        final user = UserModel.fromJson(userData);
-
-        // Update last login timestamp
-        try {
-          await SupabaseService.updateUserLastLogin(mobileNumber);
-        } catch (e) {
-          // Non-critical error, continue with login
-          print('Failed to update last login: $e');
-        }
-
-        await setCurrentUser(user);
-        return user;
+      if (userData == null) {
+        print('❌ AuthService: User not found in database');
+        return null;
       }
 
-      // Fallback to local storage
-      final prefs = await SharedPreferences.getInstance();
-      final userJson = prefs.getString('user_$mobileNumber');
+      final user = UserModel.fromJson(userData);
 
-      if (userJson != null) {
-        final user = UserModel.fromJson(json.decode(userJson));
-        await setCurrentUser(user);
-        return user;
+      // Update last login timestamp in database
+      try {
+        await SupabaseService.updateUserLastLogin(mobileNumber);
+      } catch (e) {
+        print('⚠️ Failed to update last login: $e (non-critical)');
       }
 
-      return null;
+      await _setCurrentUserSession(user);
+      print('🟢 AuthService: User logged in successfully');
+      return user;
     } catch (e) {
-      print('Login error: $e');
-      // Fallback to local storage
-      final prefs = await SharedPreferences.getInstance();
-      final userJson = prefs.getString('user_$mobileNumber');
-
-      if (userJson != null) {
-        final user = UserModel.fromJson(json.decode(userJson));
-        await setCurrentUser(user);
-        return user;
-      }
-
+      print('❌ Login error: $e');
       return null;
     }
   }
 
-  // Save user data
-  static Future<void> saveUser(UserModel user) async {
+  // Set current user session (minimal - just ID and phone)
+  static Future<void> _setCurrentUserSession(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_${user.mobileNumber}', json.encode(user.toJson()));
-    await setCurrentUser(user);
-  }
-
-  // Set current user
-  static Future<void> setCurrentUser(UserModel user) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userKey, json.encode(user.toJson()));
+    await prefs.setString(_currentUserIdKey, user.id);
+    await prefs.setString(_currentUserPhoneKey, user.mobileNumber);
     await prefs.setBool(_isLoggedInKey, true);
   }
 
-  // Get current user
+  // Get current user (fetch fresh from database every time)
   static Future<UserModel?> getCurrentUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userJson = prefs.getString(_userKey);
+      final phoneNumber = prefs.getString(_currentUserPhoneKey);
 
-      if (userJson != null) {
-        return UserModel.fromJson(json.decode(userJson));
+      if (phoneNumber == null) {
+        return null;
       }
 
-      return null;
+      // Always fetch fresh data from database
+      final userData = await SupabaseService.getUserByPhone(phoneNumber);
+      if (userData == null) {
+        return null;
+      }
+
+      return UserModel.fromJson(userData);
     } catch (e) {
       print('Get current user error: $e');
       return null;
@@ -278,100 +238,64 @@ class AuthService {
     return prefs.getBool(_isLoggedInKey) ?? false;
   }
 
-  // Logout user
+  // Logout user (clear session only)
   static Future<void> logout() async {
-    // Clear local storage
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userKey);
+    await prefs.remove(_currentUserIdKey);
+    await prefs.remove(_currentUserPhoneKey);
     await prefs.setBool(_isLoggedInKey, false);
   }
 
-  // Update user profile
+  // Update user profile (database ONLY)
   static Future<void> updateUserProfile(UserModel user) async {
     try {
-      // Update in Supabase (using phone number to identify user)
-      await SupabaseService.updateUserProfile(user.mobileNumber, {
-        'name': user.name,
-        'nic': user.nic,
-        'date_of_birth': user.dateOfBirth?.toIso8601String(),
-        'gender': user.gender,
-        'profile_picture_path': user.profilePicturePath,
-      });
+      print('🔵 AuthService: Updating user profile in database');
 
-      // Update last login
-      await SupabaseService.updateUserLastLogin(user.mobileNumber);
+      // Update in database using the correct schema
+      await SupabaseService.createOrUpdateUserProfile(
+        mobileNumber: user.mobileNumber,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName,
+        nic: user.nic,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        profilePictureUrl: user.profilePictureUrl,
+      );
 
-      // Update locally
-      await saveUser(user);
+      print('🟢 AuthService: Profile updated successfully in database');
     } catch (e) {
-      print('Update profile error: $e');
-      // Fallback to local update
-      await saveUser(user);
+      print('❌ Update profile error: $e');
+      rethrow;
     }
   }
 
-  // Check if mobile number is registered
+  // Check if mobile number is registered (database check)
   static Future<bool> isMobileRegistered(String mobileNumber) async {
     try {
-      // Check in Supabase
       final userData = await SupabaseService.getUserByPhone(mobileNumber);
-      if (userData != null) {
-        return true;
-      }
-
-      // Fallback to local check
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.containsKey('user_$mobileNumber');
+      return userData != null;
     } catch (e) {
       print('Check registration error: $e');
-      // Fallback to local check
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.containsKey('user_$mobileNumber');
-    }
-  }
-
-  // Sync local user to Supabase (useful for migration)
-  static Future<void> syncLocalUserToSupabase(UserModel user) async {
-    try {
-      final exists = await SupabaseService.userProfileExists(user.mobileNumber);
-      if (!exists) {
-        await SupabaseService.createUserProfile({
-          'mobile_number': user.mobileNumber,
-          'adm_code': user.admCode,
-          'role': user.role.toString().split('.').last,
-          'is_verified': user.isVerified,
-          'created_at': user.createdAt.toIso8601String(),
-          'name': user.name,
-          'nic': user.nic,
-          'date_of_birth': user.dateOfBirth?.toIso8601String(),
-          'gender': user.gender,
-          'profile_picture_path': user.profilePicturePath,
-        });
-      }
-    } catch (e) {
-      print('Sync error: $e');
+      return false;
     }
   }
 
   // Update phone number (requires OTP verification)
   static Future<void> updatePhoneNumber(String oldPhone, String newPhone) async {
     try {
+      print('🔵 AuthService: Updating phone number from $oldPhone to $newPhone');
+
       // Update in database
       await SupabaseService.updatePhoneNumber(oldPhone, newPhone);
 
-      // Update locally
+      // Update session
       final prefs = await SharedPreferences.getInstance();
-      final currentUserJson = prefs.getString(_userKey);
-      if (currentUserJson != null) {
-        final userData = json.decode(currentUserJson);
-        userData['mobile_number'] = newPhone;
-        await prefs.setString(_userKey, json.encode(userData));
-      }
+      await prefs.setString(_currentUserPhoneKey, newPhone);
 
-      // Clear old user data
-      await prefs.remove('user_$oldPhone');
+      print('🟢 AuthService: Phone number updated successfully');
     } catch (e) {
-      print('Update phone number error: $e');
+      print('❌ Update phone number error: $e');
       rethrow;
     }
   }

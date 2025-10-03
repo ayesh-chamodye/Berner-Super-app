@@ -4,6 +4,8 @@ import 'package:geolocator/geolocator.dart';
 
 class WeatherData {
   final String cityName;
+  final String region;
+  final String country;
   final double temperature;
   final double feelsLike;
   final int humidity;
@@ -11,11 +13,15 @@ class WeatherData {
   final double windSpeed;
   final int visibility;
   final String description;
-  final String iconCode;
+  final String iconUrl;
+  final int cloudCover;
+  final double uvIndex;
   final DateTime timestamp;
 
   WeatherData({
     required this.cityName,
+    required this.region,
+    required this.country,
     required this.temperature,
     required this.feelsLike,
     required this.humidity,
@@ -23,21 +29,30 @@ class WeatherData {
     required this.windSpeed,
     required this.visibility,
     required this.description,
-    required this.iconCode,
+    required this.iconUrl,
+    required this.cloudCover,
+    required this.uvIndex,
     required this.timestamp,
   });
 
   factory WeatherData.fromJson(Map<String, dynamic> json) {
+    final location = json['location'];
+    final current = json['current'];
+
     return WeatherData(
-      cityName: json['name'] ?? 'Unknown Location',
-      temperature: (json['main']['temp'] as num).toDouble(),
-      feelsLike: (json['main']['feels_like'] as num).toDouble(),
-      humidity: json['main']['humidity'],
-      pressure: json['main']['pressure'],
-      windSpeed: (json['wind']['speed'] as num).toDouble(),
-      visibility: json['visibility'] ?? 10000,
-      description: json['weather'][0]['description'],
-      iconCode: json['weather'][0]['icon'],
+      cityName: location['name'] ?? 'Unknown Location',
+      region: location['region'] ?? '',
+      country: location['country'] ?? '',
+      temperature: (current['temp_c'] as num).toDouble(),
+      feelsLike: (current['feelslike_c'] as num).toDouble(),
+      humidity: current['humidity'],
+      pressure: (current['pressure_mb'] as num).toInt(),
+      windSpeed: (current['wind_kph'] as num).toDouble() / 3.6, // Convert to m/s
+      visibility: ((current['vis_km'] as num).toDouble() * 1000).toInt(),
+      description: current['condition']['text'],
+      iconUrl: 'https:${current['condition']['icon']}',
+      cloudCover: current['cloud'],
+      uvIndex: (current['uv'] as num).toDouble(),
       timestamp: DateTime.now(),
     );
   }
@@ -50,7 +65,9 @@ class ForecastData {
   final double maxTemp;
   final int humidity;
   final String description;
-  final String iconCode;
+  final String iconUrl;
+  final double chanceOfRain;
+  final double maxWindSpeed;
 
   ForecastData({
     required this.dateTime,
@@ -59,18 +76,23 @@ class ForecastData {
     required this.maxTemp,
     required this.humidity,
     required this.description,
-    required this.iconCode,
+    required this.iconUrl,
+    required this.chanceOfRain,
+    required this.maxWindSpeed,
   });
 
   factory ForecastData.fromJson(Map<String, dynamic> json) {
+    final day = json['day'];
     return ForecastData(
-      dateTime: DateTime.fromMillisecondsSinceEpoch(json['dt'] * 1000),
-      temperature: (json['main']['temp'] as num).toDouble(),
-      minTemp: (json['main']['temp_min'] as num).toDouble(),
-      maxTemp: (json['main']['temp_max'] as num).toDouble(),
-      humidity: json['main']['humidity'],
-      description: json['weather'][0]['description'],
-      iconCode: json['weather'][0]['icon'],
+      dateTime: DateTime.parse(json['date']),
+      temperature: (day['avgtemp_c'] as num).toDouble(),
+      minTemp: (day['mintemp_c'] as num).toDouble(),
+      maxTemp: (day['maxtemp_c'] as num).toDouble(),
+      humidity: (day['avghumidity'] as num).toInt(),
+      description: day['condition']['text'],
+      iconUrl: 'https:${day['condition']['icon']}',
+      chanceOfRain: (day['daily_chance_of_rain'] as num).toDouble(),
+      maxWindSpeed: (day['maxwind_kph'] as num).toDouble() / 3.6,
     );
   }
 }
@@ -81,8 +103,9 @@ class HourlyWeatherData {
   final int humidity;
   final double windSpeed;
   final String description;
-  final String iconCode;
+  final String iconUrl;
   final double precipitationProbability;
+  final double precipitationMM;
 
   HourlyWeatherData({
     required this.dateTime,
@@ -90,27 +113,29 @@ class HourlyWeatherData {
     required this.humidity,
     required this.windSpeed,
     required this.description,
-    required this.iconCode,
+    required this.iconUrl,
     required this.precipitationProbability,
+    required this.precipitationMM,
   });
 
   factory HourlyWeatherData.fromJson(Map<String, dynamic> json) {
     return HourlyWeatherData(
-      dateTime: DateTime.fromMillisecondsSinceEpoch(json['dt'] * 1000),
-      temperature: (json['main']['temp'] as num).toDouble(),
-      humidity: json['main']['humidity'],
-      windSpeed: (json['wind']?['speed'] as num?)?.toDouble() ?? 0.0,
-      description: json['weather'][0]['description'],
-      iconCode: json['weather'][0]['icon'],
-      precipitationProbability: (json['pop'] as num?)?.toDouble() ?? 0.0,
+      dateTime: DateTime.parse(json['time']),
+      temperature: (json['temp_c'] as num).toDouble(),
+      humidity: json['humidity'],
+      windSpeed: (json['wind_kph'] as num).toDouble() / 3.6,
+      description: json['condition']['text'],
+      iconUrl: 'https:${json['condition']['icon']}',
+      precipitationProbability: (json['chance_of_rain'] as num).toDouble(),
+      precipitationMM: (json['precip_mm'] as num).toDouble(),
     );
   }
 }
 
 class WeatherService {
-  // Get your free API key from https://openweathermap.org/api
-  static const String _apiKey = '7c4601d5ccf87b43c5f3a884c3ae9e47'; // Demo key - replace with your own
-  static const String _baseUrl = 'https://api.openweathermap.org/data/2.5';
+  // WeatherAPI.com API Key
+  static const String _apiKey = '1dc7e18384754237bbd151618250210';
+  static const String _baseUrl = 'https://api.weatherapi.com/v1';
 
   Future<Position> _getCurrentPosition() async {
     LocationPermission permission = await Geolocator.checkPermission();
@@ -134,18 +159,24 @@ class WeatherService {
     try {
       final position = await _getCurrentPosition();
 
-      final url = '$_baseUrl/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$_apiKey&units=metric';
+      final url = '$_baseUrl/current.json?key=$_apiKey&q=${position.latitude},${position.longitude}&aqi=no';
+
+      print('🌤️ Fetching weather from: $url');
 
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print('🟢 Weather data fetched successfully');
         return WeatherData.fromJson(data);
       } else {
+        print('❌ Failed to load weather data: ${response.statusCode}');
+        print('Response: ${response.body}');
         throw Exception('Failed to load weather data: ${response.statusCode}');
       }
     } catch (e) {
-      // Fallback to mock data for demo purposes
+      print('❌ Error fetching weather: $e');
+      // Fallback to mock data
       return _getMockCurrentWeather();
     }
   }
@@ -154,34 +185,29 @@ class WeatherService {
     try {
       final position = await _getCurrentPosition();
 
-      final url = '$_baseUrl/forecast?lat=${position.latitude}&lon=${position.longitude}&appid=$_apiKey&units=metric';
+      // Get 7-day forecast
+      final url = '$_baseUrl/forecast.json?key=$_apiKey&q=${position.latitude},${position.longitude}&days=7&aqi=no&alerts=no';
+
+      print('🌤️ Fetching forecast from: $url');
 
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List<dynamic> forecastList = data['list'];
+        final List<dynamic> forecastDays = data['forecast']['forecastday'];
 
-        // Get next 7 days of forecast (taking one forecast per day at noon)
-        final List<ForecastData> forecast = [];
-        final Set<String> addedDays = {};
+        print('🟢 Forecast data fetched: ${forecastDays.length} days');
 
-        for (var item in forecastList) {
-          final forecastData = ForecastData.fromJson(item);
-          final dayKey = '${forecastData.dateTime.year}-${forecastData.dateTime.month}-${forecastData.dateTime.day}';
-
-          if (!addedDays.contains(dayKey) && forecast.length < 7) {
-            forecast.add(forecastData);
-            addedDays.add(dayKey);
-          }
-        }
-
-        return forecast;
+        return forecastDays
+            .map((item) => ForecastData.fromJson(item))
+            .toList();
       } else {
+        print('❌ Failed to load forecast data: ${response.statusCode}');
         throw Exception('Failed to load forecast data: ${response.statusCode}');
       }
     } catch (e) {
-      // Fallback to mock data for demo purposes
+      print('❌ Error fetching forecast: $e');
+      // Fallback to mock data
       return _getMockForecast();
     }
   }
@@ -190,35 +216,39 @@ class WeatherService {
     try {
       final position = await _getCurrentPosition();
 
-      final url = '$_baseUrl/forecast?lat=${position.latitude}&lon=${position.longitude}&appid=$_apiKey&units=metric';
+      // Get today's hourly forecast
+      final url = '$_baseUrl/forecast.json?key=$_apiKey&q=${position.latitude},${position.longitude}&days=1&aqi=no&alerts=no';
+
+      print('🌤️ Fetching hourly forecast from: $url');
 
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List<dynamic> forecastList = data['list'];
+        final List<dynamic> hourlyData = data['forecast']['forecastday'][0]['hour'];
 
-        // Get next 24 hours of forecast data
-        final List<HourlyWeatherData> hourlyForecast = [];
         final now = DateTime.now();
+        final List<HourlyWeatherData> hourlyForecast = [];
 
-        for (var item in forecastList) {
-          final hourlyData = HourlyWeatherData.fromJson(item);
+        // Get next 24 hours
+        for (var item in hourlyData) {
+          final hourlyWeather = HourlyWeatherData.fromJson(item);
 
-          // Only include data for the next 24 hours
-          if (hourlyData.dateTime.isAfter(now) &&
-              hourlyData.dateTime.isBefore(now.add(const Duration(hours: 24))) &&
-              hourlyForecast.length < 8) { // Show every 3 hours for next 24 hours
-            hourlyForecast.add(hourlyData);
+          if (hourlyWeather.dateTime.isAfter(now) && hourlyForecast.length < 8) {
+            hourlyForecast.add(hourlyWeather);
           }
         }
 
+        print('🟢 Hourly forecast fetched: ${hourlyForecast.length} hours');
+
         return hourlyForecast;
       } else {
+        print('❌ Failed to load hourly forecast data: ${response.statusCode}');
         throw Exception('Failed to load hourly forecast data: ${response.statusCode}');
       }
     } catch (e) {
-      // Fallback to mock data for demo purposes
+      print('❌ Error fetching hourly forecast: $e');
+      // Fallback to mock data
       return _getMockHourlyForecast();
     }
   }
@@ -226,14 +256,18 @@ class WeatherService {
   WeatherData _getMockCurrentWeather() {
     return WeatherData(
       cityName: 'Demo City',
-      temperature: 24.5,
-      feelsLike: 26.2,
-      humidity: 65,
-      pressure: 1013,
-      windSpeed: 3.2,
+      region: 'Demo Region',
+      country: 'Sri Lanka',
+      temperature: 28.5,
+      feelsLike: 31.2,
+      humidity: 75,
+      pressure: 1011,
+      windSpeed: 4.2,
       visibility: 10000,
-      description: 'Clear sky',
-      iconCode: '01d',
+      description: 'Partly cloudy',
+      iconUrl: 'https://cdn.weatherapi.com/weather/64x64/day/116.png',
+      cloudCover: 25,
+      uvIndex: 7.0,
       timestamp: DateTime.now(),
     );
   }
@@ -244,16 +278,18 @@ class WeatherService {
 
     for (int i = 0; i < 7; i++) {
       final date = now.add(Duration(days: i));
-      final baseTemp = 22.0 + (i * 2) + (i % 3) * 3;
+      final baseTemp = 26.0 + (i * 1.5);
 
       mockForecast.add(ForecastData(
         dateTime: date,
         temperature: baseTemp,
-        minTemp: baseTemp - 5,
+        minTemp: baseTemp - 3,
         maxTemp: baseTemp + 5,
-        humidity: 60 + (i * 5),
+        humidity: 70 + (i * 2),
         description: i % 3 == 0 ? 'Sunny' : i % 3 == 1 ? 'Partly cloudy' : 'Cloudy',
-        iconCode: i % 3 == 0 ? '01d' : i % 3 == 1 ? '02d' : '03d',
+        iconUrl: 'https://cdn.weatherapi.com/weather/64x64/day/${i % 3 == 0 ? '113' : i % 3 == 1 ? '116' : '119'}.png',
+        chanceOfRain: i % 3 == 2 ? 40.0 : 10.0,
+        maxWindSpeed: 3.5 + (i * 0.5),
       ));
     }
 
@@ -266,16 +302,17 @@ class WeatherService {
 
     for (int i = 1; i <= 8; i++) {
       final time = now.add(Duration(hours: i * 3));
-      final baseTemp = 20.0 + (i * 2) + (i % 2) * 3;
+      final baseTemp = 25.0 + (i * 1.5);
 
       mockHourlyForecast.add(HourlyWeatherData(
         dateTime: time,
         temperature: baseTemp,
-        humidity: 55 + (i * 3),
-        windSpeed: 2.5 + (i * 0.5),
+        humidity: 65 + (i * 2),
+        windSpeed: 3.0 + (i * 0.4),
         description: i % 4 == 0 ? 'Clear' : i % 4 == 1 ? 'Partly cloudy' : i % 4 == 2 ? 'Cloudy' : 'Light rain',
-        iconCode: i % 4 == 0 ? '01d' : i % 4 == 1 ? '02d' : i % 4 == 2 ? '03d' : '10d',
-        precipitationProbability: i % 4 == 3 ? 0.8 : i % 4 == 2 ? 0.3 : 0.1,
+        iconUrl: 'https://cdn.weatherapi.com/weather/64x64/day/${i % 4 == 0 ? '113' : i % 4 == 1 ? '116' : i % 4 == 2 ? '119' : '176'}.png',
+        precipitationProbability: i % 4 == 3 ? 60.0 : i % 4 == 2 ? 20.0 : 5.0,
+        precipitationMM: i % 4 == 3 ? 2.5 : 0.0,
       ));
     }
 

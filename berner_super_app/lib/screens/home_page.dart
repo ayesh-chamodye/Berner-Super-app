@@ -6,9 +6,12 @@ import '../theme/app_theme.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
+import '../services/supabase_service.dart';
 import 'expense_page.dart';
 import 'profile_page.dart';
 import 'weather_screen.dart';
+import 'support_tickets_page.dart';
+import 'notifications_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -21,8 +24,12 @@ class _HomePageState extends State<HomePage> {
   int _currentSliderIndex = 0;
   final CarouselSliderController _carouselController = CarouselSliderController();
   UserModel? _currentUser;
+  List<Map<String, dynamic>> _banners = [];
+  bool _isLoadingBanners = true;
+  int _unreadNotificationCount = 0;
 
-  final List<String> sliderImages = [
+  // Fallback local images if no banners from DB
+  final List<String> _fallbackImages = [
     'assets/images/slider1.svg',
     'assets/images/slider2.svg',
     'assets/images/slider3.svg',
@@ -60,6 +67,8 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadCurrentUser();
+    _loadBanners();
+    _loadUnreadNotificationCount();
   }
 
   Future<void> _loadCurrentUser() async {
@@ -69,6 +78,49 @@ class _HomePageState extends State<HomePage> {
         _currentUser = user;
       });
     }
+  }
+
+  Future<void> _loadUnreadNotificationCount() async {
+    try {
+      final user = await AuthService.getCurrentUser();
+      if (user == null) return;
+
+      final count = await SupabaseService.getUnreadNotificationCount(user.id.toString());
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = count;
+        });
+      }
+    } catch (e) {
+      print('Error loading unread notification count: $e');
+    }
+  }
+
+  Future<void> _loadBanners() async {
+    try {
+      final banners = await SupabaseService.getActiveBanners();
+
+      if (mounted) {
+        setState(() {
+          _banners = banners;
+          _isLoadingBanners = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading banners: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingBanners = false;
+        });
+      }
+    }
+  }
+
+  List<dynamic> get _displayItems {
+    if (_banners.isNotEmpty) {
+      return _banners;
+    }
+    return _fallbackImages;
   }
 
   @override
@@ -106,42 +158,45 @@ class _HomePageState extends State<HomePage> {
             child: Stack(
               children: [
                 IconButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Notifications opened'),
-                        duration: Duration(seconds: 1),
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationsPage(),
                       ),
                     );
+                    // Reload unread count after returning from notifications page
+                    _loadUnreadNotificationCount();
                   },
                   icon: const Icon(Icons.notifications_outlined),
                   iconSize: 26,
                 ),
-                // Notification badge
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: AppColors.error,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      '3',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                // Notification badge - only show if there are unread notifications
+                if (_unreadNotificationCount > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      textAlign: TextAlign.center,
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -232,70 +287,138 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  CarouselSlider(
-                    carouselController: _carouselController,
-                    options: CarouselOptions(
-                      height: 200,
-                      autoPlay: true,
-                      autoPlayInterval: const Duration(seconds: 4),
-                      autoPlayAnimationDuration: const Duration(milliseconds: 800),
-                      autoPlayCurve: Curves.fastOutSlowIn,
-                      enlargeCenterPage: true,
-                      enlargeFactor: 0.2,
-                      viewportFraction: 0.9,
-                      onPageChanged: (index, reason) {
-                        setState(() {
-                          _currentSliderIndex = index;
-                        });
-                      },
-                    ),
-                    items: sliderImages.map((imagePath) {
-                      return Builder(
-                        builder: (BuildContext context) {
-                          return Container(
-                            width: MediaQuery.of(context).size.width,
-                            margin: const EdgeInsets.symmetric(horizontal: 5.0),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: SvgPicture.asset(
-                                imagePath,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
+                  _isLoadingBanners
+                      ? Container(
+                          height: 200,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.grey[800]
+                                : Colors.grey[200],
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      : _displayItems.isEmpty
+                          ? Container(
+                              height: 200,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey[800]
+                                    : Colors.grey[200],
                               ),
+                              child: const Center(
+                                child: Text('No banners available'),
+                              ),
+                            )
+                          : CarouselSlider(
+                              carouselController: _carouselController,
+                              options: CarouselOptions(
+                                height: 200,
+                                autoPlay: true,
+                                autoPlayInterval: const Duration(seconds: 4),
+                                autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                                autoPlayCurve: Curves.fastOutSlowIn,
+                                enlargeCenterPage: true,
+                                enlargeFactor: 0.2,
+                                viewportFraction: 0.9,
+                                onPageChanged: (index, reason) {
+                                  setState(() {
+                                    _currentSliderIndex = index;
+                                  });
+                                },
+                              ),
+                              items: _displayItems.map((item) {
+                                return Builder(
+                                  builder: (BuildContext context) {
+                                    final bool isFromDatabase = item is Map<String, dynamic>;
+                                    final String imageUrl = isFromDatabase
+                                        ? item['image_url'] ?? ''
+                                        : item as String;
+
+                                    return GestureDetector(
+                                      onTap: isFromDatabase
+                                          ? () {
+                                              // Handle banner click
+                                              if (item['link_url'] != null) {
+                                                print('Banner clicked: ${item['title']}');
+                                                // TODO: Navigate based on link_type
+                                              }
+                                            }
+                                          : null,
+                                      child: Container(
+                                        width: MediaQuery.of(context).size.width,
+                                        margin: const EdgeInsets.symmetric(horizontal: 5.0),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(12),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.1),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: isFromDatabase
+                                              ? Image.network(
+                                                  imageUrl,
+                                                  fit: BoxFit.cover,
+                                                  width: double.infinity,
+                                                  loadingBuilder: (context, child, loadingProgress) {
+                                                    if (loadingProgress == null) return child;
+                                                    return Center(
+                                                      child: CircularProgressIndicator(
+                                                        value: loadingProgress.expectedTotalBytes != null
+                                                            ? loadingProgress.cumulativeBytesLoaded /
+                                                                loadingProgress.expectedTotalBytes!
+                                                            : null,
+                                                      ),
+                                                    );
+                                                  },
+                                                  errorBuilder: (context, error, stackTrace) {
+                                                    return Container(
+                                                      color: Colors.grey[300],
+                                                      child: const Center(
+                                                        child: Icon(Icons.broken_image, size: 50),
+                                                      ),
+                                                    );
+                                                  },
+                                                )
+                                              : SvgPicture.asset(
+                                                  imageUrl,
+                                                  fit: BoxFit.cover,
+                                                  width: double.infinity,
+                                                ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              }).toList(),
                             ),
-                          );
-                        },
-                      );
-                    }).toList(),
-                  ),
                   const SizedBox(height: 16),
                   // Slider Indicators
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: sliderImages.asMap().entries.map((entry) {
-                      return Container(
-                        width: _currentSliderIndex == entry.key ? 24 : 8,
-                        height: 8,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          color: _currentSliderIndex == entry.key
-                              ? AppColors.primaryOrange
-                              : AppColors.secondaryBlue.withValues(alpha: 0.3),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                  if (!_isLoadingBanners && _displayItems.isNotEmpty)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: _displayItems.asMap().entries.map((entry) {
+                        return Container(
+                          width: _currentSliderIndex == entry.key ? 24 : 8,
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            color: _currentSliderIndex == entry.key
+                                ? AppColors.primaryOrange
+                                : AppColors.secondaryBlue.withValues(alpha: 0.3),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                 ],
               ),
             ),
@@ -397,6 +520,14 @@ class _HomePageState extends State<HomePage> {
         'Support',
         Icons.support_agent,
         AppColors.success,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SupportTicketsPage(),
+            ),
+          );
+        },
       ),
       _buildQuickActionCard(
         context,

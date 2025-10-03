@@ -2,13 +2,37 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConfig {
   // Supabase Configuration
-  static String get supabaseUrl => dotenv.env['SUPABASE_URL'] ?? '';
-  static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  // Tries dart-define first (release), then .env (dev)
+  static String get supabaseUrl {
+    const fromDefine = String.fromEnvironment('SUPABASE_URL');
+    if (fromDefine.isNotEmpty) return fromDefine;
+    return dotenv.env['SUPABASE_URL'] ?? '';
+  }
+
+  static String get supabaseAnonKey {
+    const fromDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
+    if (fromDefine.isNotEmpty) return fromDefine;
+    return dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  }
 
   // Text.lk SMS API Configuration
-  static String get textlkApiToken => dotenv.env['TEXTLK_API_TOKEN'] ?? '';
-  static String get textlkApiUrl => dotenv.env['TEXTLK_API_URL'] ?? 'https://app.text.lk/api/v3';
-  static String get textlkHttpApiUrl => dotenv.env['TEXTLK_HTTP_API_URL'] ?? 'https://app.text.lk/api/http';
+  static String get textlkApiToken {
+    const fromDefine = String.fromEnvironment('TEXTLK_API_TOKEN');
+    if (fromDefine.isNotEmpty) return fromDefine;
+    return dotenv.env['TEXTLK_API_TOKEN'] ?? '';
+  }
+
+  static String get textlkApiUrl {
+    const fromDefine = String.fromEnvironment('TEXTLK_API_URL');
+    if (fromDefine.isNotEmpty) return fromDefine;
+    return dotenv.env['TEXTLK_API_URL'] ?? 'https://app.text.lk/api/v3';
+  }
+
+  static String get textlkHttpApiUrl {
+    const fromDefine = String.fromEnvironment('TEXTLK_HTTP_API_URL');
+    if (fromDefine.isNotEmpty) return fromDefine;
+    return dotenv.env['TEXTLK_HTTP_API_URL'] ?? 'https://app.text.lk/api/http';
+  }
 
   // Validate configuration
   static bool get isConfigured {
@@ -17,8 +41,12 @@ class AppConfig {
            textlkApiToken.isNotEmpty;
   }
 
-  // Initialize configuration
+  // Initialize configuration (loads .env in dev mode)
   static Future<void> initialize() async {
-    await dotenv.load(fileName: ".env");
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      // .env not found - using dart-define values (release mode)
+    }
   }
 }

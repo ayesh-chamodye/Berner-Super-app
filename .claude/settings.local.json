@@ -13,7 +13,10 @@
       "Bash(move burner_logo_enhanced.svg berner_logo_enhanced.svg)",
       "Bash(dart:*)",
       "Bash(cat:*)",
-      "Bash(curl -I https://ompqyjdrfnjdxqavslhg.supabase.co)"
+      "Bash(curl -I https://ompqyjdrfnjdxqavslhg.supabase.co)",
+      "Bash(gradlew:*)",
+      "Bash(./gradlew:*)",
+      "Bash(cmd /c:*)"
     ],
     "deny": [],
     "ask": []

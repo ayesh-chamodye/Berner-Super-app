@@ -258,8 +258,60 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       print('🔵 ProfileSetupPage: DOB: $_selectedDate');
       print('🔵 ProfileSetupPage: Gender: $_selectedGender');
 
-      // Save profile to Supabase using create_user_with_profile or update existing profile
+      // Convert gender to lowercase to match database constraint
+      final genderValue = _selectedGender?.toLowerCase();
+      print('🔵 ProfileSetupPage: Gender (converted): $genderValue');
+
+      // Prepare and upload profile picture (before the try block)
+      String? profilePictureUrl;
+
+      // Save profile to Supabase - ensure user exists first
       try {
+        print('🔵 ProfileSetupPage: Checking if user exists in database...');
+
+        // Check if user exists in database
+        final existingUser = await SupabaseService.getUserByPhone(widget.user.mobileNumber);
+
+        if (existingUser == null) {
+          print('⚠️ ProfileSetupPage: User not found in database, creating user first...');
+
+          // Create user in database if they don't exist
+          await SupabaseService.createBasicUser(
+            mobileNumber: widget.user.mobileNumber,
+            role: widget.user.role.toString().split('.').last,
+          );
+
+          // Mark as verified since they've completed OTP
+          await SupabaseService.markUserAsVerified(widget.user.mobileNumber);
+
+          print('🟢 ProfileSetupPage: User created in database');
+        } else {
+          print('🟢 ProfileSetupPage: User already exists in database');
+        }
+
+        // Upload profile picture to Supabase Storage
+        if (_profileImage != null) {
+          print('🔵 ProfileSetupPage: Uploading profile picture to Supabase...');
+
+          // First create the user if they don't exist yet (we need the ID)
+          final existingUserData = await SupabaseService.getUserByPhone(widget.user.mobileNumber);
+          final userId = existingUserData?['id']?.toString() ?? widget.user.id;
+
+          final uploadedUrl = await SupabaseService.uploadProfilePicture(
+            _profileImage!.path,
+            userId,
+          );
+
+          if (uploadedUrl != null) {
+            profilePictureUrl = uploadedUrl;
+            print('🟢 ProfileSetupPage: Profile picture uploaded successfully');
+          } else {
+            print('⚠️ ProfileSetupPage: Profile picture upload failed, using local path');
+            profilePictureUrl = _profileImage!.path;
+          }
+        }
+
+        // Now save the profile
         await SupabaseService.createOrUpdateUserProfile(
           mobileNumber: widget.user.mobileNumber,
           firstName: firstName,
@@ -267,14 +319,24 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           fullName: fullName,
           nic: _nicController.text.trim(),
           dateOfBirth: _selectedDate,
-          gender: _selectedGender,
-          profilePictureUrl: _profileImage?.path,
+          gender: genderValue,
+          profilePictureUrl: profilePictureUrl,
         );
         print('🟢 ProfileSetupPage: Profile saved to Supabase successfully!');
       } catch (supabaseError) {
         print('❌ ProfileSetupPage: Failed to save to Supabase: $supabaseError');
-        print('⚠️ ProfileSetupPage: Will save to local storage only');
-        // Continue execution - app will work with local storage
+        print('❌ ProfileSetupPage: This will cause issues with profile updates later!');
+
+        // Show error to user instead of silently failing
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Warning: Failed to save to database. Changes may not persist.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
       }
 
       // Update user model locally
@@ -284,8 +346,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         fullName: fullName,
         nic: _nicController.text.trim(),
         dateOfBirth: _selectedDate,
-        gender: _selectedGender,
-        profilePictureUrl: _profileImage?.path,
+        gender: genderValue,  // Use lowercase gender
+        profilePictureUrl: profilePictureUrl,
       );
 
       await AuthService.updateUserProfile(updatedUser);

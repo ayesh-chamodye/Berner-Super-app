@@ -726,9 +726,46 @@ BEGIN
     END LOOP;
 END $$;
 
+-- =====================================================
+-- POLICIES FOR ANONYMOUS USERS (Registration & Login)
+-- =====================================================
+
+-- Allow anonymous users to create accounts during registration
+CREATE POLICY "Allow anon to create users"
+    ON users
+    FOR INSERT
+    TO anon
+    WITH CHECK (true);
+
+-- Allow anonymous users to read users table (for login check)
+CREATE POLICY "Allow anon to read users"
+    ON users
+    FOR SELECT
+    TO anon
+    USING (true);
+
+-- Allow anonymous users to update users (for marking as verified after OTP)
+CREATE POLICY "Allow anon to update users"
+    ON users
+    FOR UPDATE
+    TO anon
+    USING (true)
+    WITH CHECK (true);
+
 -- Anonymous users can insert OTP logs (for authentication)
 CREATE POLICY "Allow anon to insert otp_logs"
     ON otp_logs
+    FOR INSERT
+    TO anon
+    WITH CHECK (true);
+
+-- =====================================================
+-- POLICIES FOR USER PROFILES
+-- =====================================================
+
+-- Allow anonymous users to create their profile after registration
+CREATE POLICY "Allow anon to create user_profiles"
+    ON user_profiles
     FOR INSERT
     TO anon
     WITH CHECK (true);

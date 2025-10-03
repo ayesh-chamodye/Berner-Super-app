@@ -50,38 +50,34 @@ class _WeatherScreenState extends State<WeatherScreen> {
     }
   }
 
-  String _getWeatherIcon(String iconCode) {
-    // Map weather icons to local icons or emojis
-    switch (iconCode) {
-      case '01d':
-      case '01n':
-        return '☀️';
-      case '02d':
-      case '02n':
-        return '⛅';
-      case '03d':
-      case '03n':
-      case '04d':
-      case '04n':
-        return '☁️';
-      case '09d':
-      case '09n':
-        return '🌧️';
-      case '10d':
-      case '10n':
-        return '🌦️';
-      case '11d':
-      case '11n':
-        return '⛈️';
-      case '13d':
-      case '13n':
-        return '❄️';
-      case '50d':
-      case '50n':
-        return '🌫️';
-      default:
-        return '🌤️';
-    }
+  Widget _buildWeatherIcon(String iconUrl, {double size = 48}) {
+    return Image.network(
+      iconUrl,
+      width: size,
+      height: size,
+      errorBuilder: (context, error, stackTrace) {
+        return Icon(
+          Icons.wb_sunny,
+          size: size,
+          color: AppColors.primaryOrange,
+        );
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return SizedBox(
+          width: size,
+          height: size,
+          child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -233,10 +229,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       ),
                       Column(
                         children: [
-                          Text(
-                            _getWeatherIcon(_currentWeather!.iconCode),
-                            style: const TextStyle(fontSize: 48),
-                          ),
+                          _buildWeatherIcon(_currentWeather!.iconUrl, size: 64),
+                          const SizedBox(height: 8),
                           Text(
                             _currentWeather!.description.toUpperCase(),
                             style: Theme.of(context).textTheme.labelMedium?.copyWith(
@@ -252,10 +246,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   // Narrow layout - stacked vertically
                   return Column(
                     children: [
-                      Text(
-                        _getWeatherIcon(_currentWeather!.iconCode),
-                        style: const TextStyle(fontSize: 64),
-                      ),
+                      _buildWeatherIcon(_currentWeather!.iconUrl, size: 80),
                       const SizedBox(height: 12),
                       Text(
                         '${_currentWeather!.temperature.round()}°C',
@@ -566,10 +557,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          Text(
-            _getWeatherIcon(forecast.iconCode),
-            style: const TextStyle(fontSize: 24),
-          ),
+          _buildWeatherIcon(forecast.iconUrl, size: 32),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
@@ -684,10 +672,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          _getWeatherIcon(hourlyData.iconCode),
-                          style: const TextStyle(fontSize: 24),
-                        ),
+                        _buildWeatherIcon(hourlyData.iconUrl, size: 32),
                         const SizedBox(height: 4),
                         Text(
                           '${hourlyData.temperature.round()}°',

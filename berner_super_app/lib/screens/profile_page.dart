@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../theme/app_theme.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 import '../widgets/enhanced_logo.dart';
 import 'auth/auth_wrapper.dart';
 
@@ -16,11 +20,28 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   UserModel? _currentUser;
   bool _isLoading = true;
+  bool _isEditMode = false;
+  bool _isSaving = false;
+
+  // Controllers for editable fields
+  final _nameController = TextEditingController();
+  final _nicController = TextEditingController();
+  String? _selectedGender;
+  DateTime? _selectedDate;
+  File? _selectedImage;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _nicController.dispose();
+    super.dispose();
   }
 
   void _loadUserData() async {
@@ -30,6 +51,14 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() {
           _currentUser = user;
           _isLoading = false;
+
+          // Populate controllers with current data
+          if (user != null) {
+            _nameController.text = user.fullName ?? user.name ?? '';
+            _nicController.text = user.nic ?? '';
+            _selectedGender = user.gender;
+            _selectedDate = user.dateOfBirth;
+          }
         });
       }
     } catch (e) {
@@ -37,6 +66,177 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  void _toggleEditMode() {
+    setState(() {
+      _isEditMode = !_isEditMode;
+      if (!_isEditMode) {
+        // Cancel edit - reload original data
+        if (_currentUser != null) {
+          _nameController.text = _currentUser!.fullName ?? _currentUser!.name ?? '';
+          _nicController.text = _currentUser!.nic ?? '';
+          _selectedGender = _currentUser!.gender;
+          _selectedDate = _currentUser!.dateOfBirth;
+          _selectedImage = null; // Reset selected image
+        }
+      }
+    });
+  }
+
+  Future<void> _pickProfilePicture() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error selecting image: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime(2000),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primaryOrange,
+              onPrimary: Colors.white,
+              surface: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.darkSurface
+                  : AppColors.surface,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+
+  void _saveProfile() async {
+    if (_currentUser == null) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      print('🔵 ProfilePage: Saving profile changes');
+
+      final nameParts = _nameController.text.trim().split(' ');
+      final firstName = nameParts.isNotEmpty ? nameParts.first : '';
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final fullName = _nameController.text.trim();
+      final genderValue = _selectedGender?.toLowerCase();
+
+      // Handle profile picture if selected
+      String? profilePictureUrl = _currentUser!.profilePictureUrl;
+      if (_selectedImage != null) {
+        // Upload to Supabase Storage
+        print('🔵 ProfilePage: Uploading profile picture to Supabase...');
+        final uploadedUrl = await SupabaseService.uploadProfilePicture(
+          _selectedImage!.path,
+          _currentUser!.id,
+        );
+
+        if (uploadedUrl != null) {
+          profilePictureUrl = uploadedUrl;
+          print('🟢 ProfilePage: Profile picture uploaded successfully');
+        } else {
+          print('⚠️ ProfilePage: Profile picture upload failed, using local path');
+          profilePictureUrl = _selectedImage!.path;
+        }
+      }
+
+      // Try to save to Supabase
+      try {
+        await SupabaseService.createOrUpdateUserProfile(
+          mobileNumber: _currentUser!.mobileNumber,
+          firstName: firstName,
+          lastName: lastName,
+          fullName: fullName,
+          nic: _nicController.text.trim(),
+          dateOfBirth: _selectedDate,
+          gender: genderValue,
+          profilePictureUrl: profilePictureUrl,
+        );
+        print('🟢 ProfilePage: Profile updated in Supabase');
+      } catch (e) {
+        print('⚠️ ProfilePage: Supabase update failed: $e');
+        // Continue to save locally
+      }
+
+      // Update local user model
+      final updatedUser = _currentUser!.copyWith(
+        firstName: firstName,
+        lastName: lastName,
+        fullName: fullName,
+        nic: _nicController.text.trim(),
+        dateOfBirth: _selectedDate,
+        gender: genderValue,
+        profilePictureUrl: profilePictureUrl,
+      );
+
+      await AuthService.updateUserProfile(updatedUser);
+      print('🟢 ProfilePage: Profile updated locally');
+
+      // Reload user data
+      _loadUserData();
+
+      if (mounted) {
+        setState(() {
+          _isEditMode = false;
+          _isSaving = false;
+          _selectedImage = null; // Clear selected image
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating profile: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     }
   }
@@ -374,6 +574,45 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          if (!_isEditMode)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              color: AppColors.primaryOrange,
+              onPressed: _toggleEditMode,
+              tooltip: 'Edit Profile',
+            )
+          else ...[
+            if (_isSaving)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryOrange,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+              )
+            else ...[
+              IconButton(
+                icon: const Icon(Icons.close),
+                color: AppColors.error,
+                onPressed: _toggleEditMode,
+                tooltip: 'Cancel',
+              ),
+              IconButton(
+                icon: const Icon(Icons.check),
+                color: AppColors.success,
+                onPressed: _saveProfile,
+                tooltip: 'Save',
+              ),
+            ],
+          ],
+        ],
       ),
       body: _isLoading
           ? Center(
@@ -429,36 +668,74 @@ class _ProfilePageState extends State<ProfilePage> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       // Profile Image Section
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.primaryOrange,
-                            width: 3,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryOrange.withValues(alpha: 0.3),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+                      GestureDetector(
+                        onTap: _isEditMode ? _pickProfilePicture : null,
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: _isEditMode
+                                      ? AppColors.primaryOrange
+                                      : AppColors.primaryOrange.withValues(alpha: 0.5),
+                                  width: 3,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primaryOrange.withValues(alpha: 0.3),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 55,
+                                backgroundColor: AppColors.primaryOrange.withValues(alpha: 0.1),
+                                backgroundImage: _selectedImage != null
+                                    ? FileImage(_selectedImage!)
+                                    : (_currentUser?.profilePictureUrl != null
+                                        ? (_currentUser!.profilePictureUrl!.startsWith('http')
+                                            ? NetworkImage(_currentUser!.profilePictureUrl!)
+                                            : (File(_currentUser!.profilePictureUrl!).existsSync()
+                                                ? FileImage(File(_currentUser!.profilePictureUrl!))
+                                                : null))
+                                        : null) as ImageProvider?,
+                                child: (_selectedImage == null && _currentUser?.profilePictureUrl == null)
+                                    ? Icon(
+                                        Icons.person,
+                                        size: 60,
+                                        color: AppColors.primaryOrange,
+                                      )
+                                    : null,
+                              ),
                             ),
+                            if (_isEditMode)
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryOrange,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Theme.of(context).brightness == Brightness.dark
+                                          ? AppColors.darkBackground
+                                          : AppColors.backgroundPrimary,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
                           ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 55,
-                          backgroundColor: AppColors.primaryOrange.withValues(alpha: 0.1),
-                          backgroundImage: _currentUser?.profilePicturePath != null
-                              ? AssetImage(_currentUser!.profilePicturePath!)
-                              : null,
-                          child: _currentUser?.profilePicturePath == null
-                              ? Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: AppColors.primaryOrange,
-                                )
-                              : null,
                         ),
                       ),
 
@@ -505,45 +782,68 @@ class _ProfilePageState extends State<ProfilePage> {
                       const SizedBox(height: 32),
 
                       // Profile Information Cards
+                      // Name field (editable)
+                      _buildEditableCard(
+                        icon: Icons.person,
+                        title: 'Full Name',
+                        controller: _nameController,
+                        isEditing: _isEditMode,
+                      ),
+
+                      const SizedBox(height: 16),
+
                       _buildInfoCard(
                         icon: Icons.phone,
                         title: 'Mobile Number',
                         value: _currentUser?.mobileNumber ?? 'Not provided',
-                        trailing: IconButton(
-                          icon: const Icon(Icons.edit, size: 20),
-                          color: AppColors.primaryOrange,
-                          onPressed: () => _changePhoneNumber(),
-                        ),
+                        trailing: !_isEditMode
+                            ? IconButton(
+                                icon: const Icon(Icons.edit, size: 20),
+                                color: AppColors.primaryOrange,
+                                onPressed: () => _changePhoneNumber(),
+                              )
+                            : null,
                       ),
 
                       const SizedBox(height: 16),
 
-                      _buildInfoCard(
+                      // NIC field (editable)
+                      _buildEditableCard(
                         icon: Icons.badge,
                         title: 'NIC Number',
-                        value: _currentUser?.nic ?? 'Not provided',
+                        controller: _nicController,
+                        isEditing: _isEditMode,
                       ),
 
                       const SizedBox(height: 16),
 
-                      _buildInfoCard(
+                      // Date of Birth (editable with date picker)
+                      _buildDatePickerCard(
                         icon: Icons.cake,
                         title: 'Date of Birth',
-                        value: _currentUser?.dateOfBirth != null
-                            ? '${_currentUser!.dateOfBirth!.day}/${_currentUser!.dateOfBirth!.month}/${_currentUser!.dateOfBirth!.year}'
-                            : 'Not provided',
+                        date: _selectedDate,
+                        isEditing: _isEditMode,
+                        onTap: () => _selectDate(context),
                       ),
 
                       const SizedBox(height: 16),
 
-                      _buildInfoCard(
-                        icon: _currentUser?.gender == 'male' ? Icons.male : Icons.female,
+                      // Gender (editable with dropdown)
+                      _buildGenderCard(
+                        icon: _selectedGender == 'male' ? Icons.male : Icons.female,
                         title: 'Gender',
-                        value: _currentUser?.gender?.toUpperCase() ?? 'Not provided',
+                        gender: _selectedGender,
+                        isEditing: _isEditMode,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedGender = value;
+                          });
+                        },
                       ),
 
                       if (_currentUser?.role == UserRole.employee) ...[
                         const SizedBox(height: 16),
+                        // ADM Code (NOT editable)
                         _buildInfoCard(
                           icon: Icons.admin_panel_settings,
                           title: 'ADM Code',
@@ -684,6 +984,260 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditableCard({
+    required IconData icon,
+    required String title,
+    required TextEditingController controller,
+    required bool isEditing,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.darkSurface
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isEditing
+              ? AppColors.primaryOrange.withValues(alpha: 0.5)
+              : AppColors.secondaryBlue.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryOrange.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: AppColors.primaryOrange,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (isEditing)
+                  TextField(
+                    controller: controller,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      border: InputBorder.none,
+                      hintText: 'Enter $title',
+                    ),
+                  )
+                else
+                  Text(
+                    controller.text.isEmpty ? 'Not provided' : controller.text,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDatePickerCard({
+    required IconData icon,
+    required String title,
+    required DateTime? date,
+    required bool isEditing,
+    required VoidCallback onTap,
+  }) {
+    final dateText = date != null
+        ? DateFormat('dd/MM/yyyy').format(date)
+        : 'Not provided';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.darkSurface
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isEditing
+              ? AppColors.primaryOrange.withValues(alpha: 0.5)
+              : AppColors.secondaryBlue.withValues(alpha: 0.2),
+        ),
+      ),
+      child: InkWell(
+        onTap: isEditing ? onTap : null,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primaryOrange,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    dateText,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isEditing)
+              Icon(
+                Icons.calendar_today,
+                color: AppColors.primaryOrange,
+                size: 20,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenderCard({
+    required IconData icon,
+    required String title,
+    required String? gender,
+    required bool isEditing,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.darkSurface
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isEditing
+              ? AppColors.primaryOrange.withValues(alpha: 0.5)
+              : AppColors.secondaryBlue.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryOrange.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: AppColors.primaryOrange,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (isEditing)
+                  DropdownButtonFormField<String>(
+                    initialValue: gender?.toLowerCase(),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      border: InputBorder.none,
+                    ),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'male', child: Text('Male')),
+                      DropdownMenuItem(value: 'female', child: Text('Female')),
+                      DropdownMenuItem(value: 'other', child: Text('Other')),
+                      DropdownMenuItem(value: 'prefer_not_to_say', child: Text('Prefer not to say')),
+                    ],
+                    onChanged: onChanged,
+                  )
+                else
+                  Text(
+                    gender != null
+                        ? (gender == 'prefer_not_to_say'
+                            ? 'Prefer not to say'
+                            : gender[0].toUpperCase() + gender.substring(1))
+                        : 'Not provided',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );

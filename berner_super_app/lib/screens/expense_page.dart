@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
+import '../services/supabase_service.dart';
+import '../services/auth_service.dart';
 
 class ExpensePage extends StatefulWidget {
   const ExpensePage({super.key});
@@ -20,8 +23,10 @@ class _ExpensePageState extends State<ExpensePage> {
   File? _mileageImage;
   final ImagePicker _picker = ImagePicker();
 
-  // Upload history log with approval status
-  final List<Map<String, dynamic>> _uploadHistory = [];
+  // Upload history log with approval status (loaded from Supabase)
+  List<Map<String, dynamic>> _uploadHistory = [];
+  bool _isLoadingHistory = true;
+  bool _isSavingExpense = false;
 
   final List<Map<String, dynamic>> _categories = [
     {
@@ -42,10 +47,82 @@ class _ExpensePageState extends State<ExpensePage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadExpenseHistory();
+  }
+
+  @override
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  /// Load expense history from Supabase
+  Future<void> _loadExpenseHistory() async {
+    try {
+      setState(() {
+        _isLoadingHistory = true;
+      });
+
+      final currentUser = await AuthService.getCurrentUser();
+      if (currentUser == null) {
+        print('⚠️ ExpensePage: No current user found');
+        return;
+      }
+
+      print('🔵 ExpensePage: Loading expense history for user ${currentUser.id}');
+      final expenses = await SupabaseService.getUserExpenses(currentUser.id);
+
+      setState(() {
+        _uploadHistory = expenses.map((expense) {
+          return {
+            'id': expense['id'],
+            'amount': expense['amount']?.toString() ?? '0',
+            'category': expense['category_name'] ?? 'Other',
+            'description': expense['description'] ?? 'No description',
+            'timestamp': DateTime.parse(expense['created_at'] ?? expense['expense_date']),
+            'status': expense['is_approved'] == true ? 'approved' :
+                     (expense['status'] == 'rejected' ? 'rejected' : 'pending'),
+            'imagePath': _getReceiptPath(expense),
+            'mileageImagePath': _getMileagePath(expense),
+          };
+        }).toList();
+        _isLoadingHistory = false;
+      });
+
+      print('🟢 ExpensePage: Loaded ${_uploadHistory.length} expenses');
+    } catch (e) {
+      print('❌ ExpensePage: Error loading expense history: $e');
+      setState(() {
+        _isLoadingHistory = false;
+      });
+    }
+  }
+
+  String? _getReceiptPath(Map<String, dynamic> expense) {
+    if (expense['expense_attachments'] != null && expense['expense_attachments'] is List) {
+      final attachments = expense['expense_attachments'] as List;
+      final receipt = attachments.firstWhere(
+        (a) => a['is_receipt'] == true,
+        orElse: () => null,
+      );
+      return receipt?['file_url'];
+    }
+    return null;
+  }
+
+  String? _getMileagePath(Map<String, dynamic> expense) {
+    if (expense['expense_attachments'] != null && expense['expense_attachments'] is List) {
+      final attachments = expense['expense_attachments'] as List;
+      final mileage = attachments.firstWhere(
+        (a) => a['is_receipt'] == false,
+        orElse: () => null,
+      );
+      return mileage?['file_url'];
+    }
+    return null;
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -286,42 +363,155 @@ class _ExpensePageState extends State<ExpensePage> {
     );
   }
 
-  void _submitExpense() {
+  Future<void> _submitExpense() async {
     if (_formKey.currentState!.validate()) {
-      // Add to upload history with initial status
       setState(() {
-        _uploadHistory.insert(0, {
-          'amount': _amountController.text,
-          'category': _selectedCategory,
-          'description': _descriptionController.text.isEmpty
-              ? 'No description'
-              : _descriptionController.text,
-          'imagePath': _selectedImage?.path,
-          'mileageImagePath': _mileageImage?.path,
-          'timestamp': DateTime.now(),
-          'status': 'pending', // pending, approved, rejected
-        });
+        _isSavingExpense = true;
       });
 
-      // Here you would typically save the expense to a database
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Expense saved: \$${_amountController.text} for $_selectedCategory',
-          ),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      try {
+        final currentUser = await AuthService.getCurrentUser();
+        if (currentUser == null) {
+          throw Exception('User not logged in');
+        }
 
-      // Clear form
-      _amountController.clear();
-      _descriptionController.clear();
-      setState(() {
-        _selectedImage = null;
-        _mileageImage = null;
-        _selectedCategory = 'Food';
-      });
+        print('🔵 ExpensePage: Creating expense...');
+
+        final amount = double.parse(_amountController.text);
+        final description = _descriptionController.text.isEmpty
+            ? 'No description'
+            : _descriptionController.text;
+
+        // Create expense in Supabase
+        final expenseId = await SupabaseService.createExpense(
+          userId: currentUser.id,
+          title: '$_selectedCategory expense',
+          amount: amount,
+          categoryName: _selectedCategory,
+          description: description,
+          expenseDate: DateTime.now(),
+        );
+
+        if (expenseId == null) {
+          throw Exception('Failed to create expense');
+        }
+
+        print('🟢 ExpensePage: Expense created with ID: $expenseId');
+
+        // Upload receipt image if selected
+        String? receiptUrl;
+        if (_selectedImage != null) {
+          print('🔵 ExpensePage: Uploading receipt image...');
+          receiptUrl = await SupabaseService.uploadExpenseReceipt(
+            _selectedImage!.path,
+            expenseId,
+          );
+
+          if (receiptUrl != null) {
+            // Save receipt attachment
+            final storagePath = 'expense_receipts/expense_${expenseId}_receipt.jpg';
+            await SupabaseService.client
+                .from('expense_attachments')
+                .insert({
+              'expense_id': expenseId,
+              'file_name': 'receipt_$expenseId.jpg',
+              'file_path': storagePath,
+              'file_url': receiptUrl,
+              'storage_bucket': 'expense-receipts',
+              'storage_path': storagePath,
+              'is_receipt': true,
+            });
+            print('🟢 ExpensePage: Receipt uploaded');
+          } else {
+            print('⚠️ ExpensePage: Receipt upload failed - URL is null');
+          }
+        }
+
+        // Upload mileage image if selected
+        String? mileageUrl;
+        if (_mileageImage != null) {
+          print('🔵 ExpensePage: Uploading mileage image...');
+          try {
+            final fileName = 'expense_${expenseId}_mileage.jpg';
+            final storagePath = 'expense_receipts/$fileName';
+            final bytes = await _mileageImage!.readAsBytes();
+
+            print('🔵 ExpensePage: Uploading ${bytes.length} bytes to $storagePath');
+
+            await SupabaseService.client.storage
+                .from('expense-receipts')
+                .uploadBinary(
+                  storagePath,
+                  bytes,
+                  fileOptions: FileOptions(upsert: true, contentType: 'image/jpeg'),
+                );
+
+            mileageUrl = SupabaseService.client.storage
+                .from('expense-receipts')
+                .getPublicUrl(storagePath);
+
+            print('🟢 ExpensePage: Mileage uploaded, URL: $mileageUrl');
+
+            // Save mileage attachment
+            await SupabaseService.client
+                .from('expense_attachments')
+                .insert({
+              'expense_id': expenseId,
+              'file_name': fileName,
+              'file_path': storagePath,
+              'file_url': mileageUrl,
+              'storage_bucket': 'expense-receipts',
+              'storage_path': storagePath,
+              'is_receipt': false,
+            });
+            print('🟢 ExpensePage: Mileage attachment saved to database');
+          } catch (uploadError) {
+            print('❌ ExpensePage: Failed to upload mileage image: $uploadError');
+            // Don't fail the entire expense save if mileage upload fails
+          }
+        }
+
+        // Reload history to show new expense
+        await _loadExpenseHistory();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Expense saved: LKR ${_amountController.text} for $_selectedCategory',
+              ),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+
+          // Clear form
+          _amountController.clear();
+          _descriptionController.clear();
+          setState(() {
+            _selectedImage = null;
+            _mileageImage = null;
+            _selectedCategory = 'Food';
+            _isSavingExpense = false;
+          });
+        }
+      } catch (e) {
+        print('❌ ExpensePage: Error saving expense: $e');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving expense: $e'),
+              backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+
+          setState(() {
+            _isSavingExpense = false;
+          });
+        }
+      }
     }
   }
 
@@ -358,10 +548,17 @@ class _ExpensePageState extends State<ExpensePage> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   hintText: 'Enter amount',
-                  prefixIcon: Icon(
-                    Icons.attach_money,
-                    color: AppColors.primaryOrange,
-                  ),
+                  prefixIcon: Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Text(
+        "LKR",
+        style: TextStyle(
+          color: Colors.deepOrange,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -831,7 +1028,7 @@ class _ExpensePageState extends State<ExpensePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '\$${expense['amount']}',
+                      '\LKR${expense['amount']}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).brightness == Brightness.dark
