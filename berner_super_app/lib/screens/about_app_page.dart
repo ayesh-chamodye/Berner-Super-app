@@ -116,7 +116,7 @@ class AboutAppPage extends StatelessWidget {
                     context,
                     icon: Icons.person,
                     label: 'Developer',
-                    value: 'L A P S VIJERATHNA',
+                    value: 'H M Ayesh Chamodya',
                   ),
                   const SizedBox(height: 16),
 
@@ -125,7 +125,7 @@ class AboutAppPage extends StatelessWidget {
                     context,
                     icon: Icons.phone,
                     label: 'Contact',
-                    value: '0761391946',
+                    value: '0766568369',
                   ),
                   const SizedBox(height: 16),
 
@@ -134,7 +134,7 @@ class AboutAppPage extends StatelessWidget {
                     context,
                     icon: Icons.email,
                     label: 'Email',
-                    value: 'pubudusandakalum27@gmail.com',
+                    value: 'ayeshchamodye@gmail.com',
                   ),
                 ],
               ),
